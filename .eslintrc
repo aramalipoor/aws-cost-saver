@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "no-warning-comments": "off"
+  },
+  "extends": [
+    "oclif",
+    "oclif-typescript",
+    "prettier/@typescript-eslint",
+    "plugin:prettier/recommended"
+  ]
+}

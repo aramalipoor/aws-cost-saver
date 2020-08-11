@@ -1,0 +1,67 @@
+{
+  "name": "aws-cost-saver",
+  "description": "A tiny CLI tool to help save costs in development environments when you're sleep and don't need them!",
+  "version": "0.0.1",
+  "author": "aramalipoor",
+  "bin": {
+    "aws-cost-saver": "./bin/run"
+  },
+  "bugs": "https://github.com/aramalipoor/aws-cost-saver/issues",
+  "dependencies": {
+    "@oclif/command": "^1",
+    "@oclif/config": "^1",
+    "@oclif/plugin-help": "^3",
+    "tslib": "^1"
+  },
+  "devDependencies": {
+    "@oclif/dev-cli": "^1",
+    "@oclif/test": "^1",
+    "@types/chai": "^4",
+    "@types/mocha": "^5",
+    "@types/node": "^10",
+    "chai": "^4",
+    "eslint": "^5.13",
+    "eslint-config-oclif": "^3.1",
+    "eslint-config-oclif-typescript": "^0.1",
+    "globby": "^10",
+    "mocha": "^5",
+    "nyc": "^14",
+    "ts-node": "^8",
+    "typescript": "^3.3",
+    "prettier": "^1.19.1",
+    "eslint-plugin-prettier": "^3.1.1",
+    "eslint-config-prettier": "^6.7.0"
+  },
+  "engines": {
+    "node": ">=8.0.0"
+  },
+  "files": [
+    "/bin",
+    "/lib",
+    "/npm-shrinkwrap.json",
+    "/oclif.manifest.json"
+  ],
+  "homepage": "https://github.com/aramalipoor/aws-cost-saver",
+  "keywords": [
+    "aws",
+    "cost",
+    "cost-saving"
+  ],
+  "license": "MIT",
+  "main": "lib/index.js",
+  "oclif": {
+    "commands": "./lib/commands",
+    "bin": "aws-cost-saver",
+    "plugins": [
+      "@oclif/plugin-help"
+    ]
+  },
+  "repository": "aramalipoor/aws-cost-saver",
+  "scripts": {
+    "postpack": "rm -f oclif.manifest.json",
+    "posttest": "eslint . --ext .ts --config .eslintrc",
+    "prepack": "rm -rf lib && tsc -b && oclif-dev manifest",
+    "test": "nyc --extension .ts mocha --forbid-only \"test/**/*.test.ts\""
+  },
+  "types": "lib/index.d.ts"
+}
