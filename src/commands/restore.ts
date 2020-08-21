@@ -63,21 +63,27 @@ AWS Cost Saver
             // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
             // @ts-ignore
             collapse: false,
+            exitOnError: false,
           });
 
-          await trick
-            .restore(
-              subListr,
-              flags['dry-run'],
-              rootState[trick.getMachineName()],
-            )
-            .catch(task.report);
+          if (rootState[trick.getMachineName()]) {
+            await trick
+              .restore(
+                subListr,
+                flags['dry-run'],
+                rootState[trick.getMachineName()],
+              )
+              .catch(task.report);
+          } else {
+            task.skip('No EC2 instances was conserved previously.');
+          }
 
           return subListr;
         },
         // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
         // @ts-ignore
         collapse: false,
+        exitOnError: false,
       });
     }
 
@@ -87,6 +93,7 @@ AWS Cost Saver
       // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
       // @ts-ignore
       collapse: false,
+      exitOnError: false,
     })
       .run()
       .then(() => {
@@ -101,6 +108,13 @@ AWS Cost Saver
             )}`,
           );
         }
+      })
+      .catch(error => {
+        this.log(
+          `\n↓ Partially restored, with ${chalk.red(
+            `${error.errors.length} errors`,
+          )}.`,
+        );
       });
   }
 }

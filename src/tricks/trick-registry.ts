@@ -2,7 +2,7 @@ import { TrickInterface } from '../interfaces/trick.interface';
 
 import { StopFargateEcsServicesTrick } from './stop-fargate-ecs-services.trick';
 import { StopRdsDatabaseInstancesTrick } from './stop-rds-database-instances.trick';
-import { RemoveNatGatewaysTrick } from './remove-nat-gateways.trick';
+// import { RemoveNatGatewaysTrick } from './remove-nat-gateways.trick';
 import { ShutdownEC2InstancesTrick } from './shutdown-ec2-instances.trick';
 
 export class TrickRegistry {

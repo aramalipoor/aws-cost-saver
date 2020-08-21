@@ -92,6 +92,7 @@ AWS Cost Saver
             // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
             // @ts-ignore
             collapse: false,
+            exitOnError: false,
           });
 
           await trick
@@ -118,6 +119,7 @@ AWS Cost Saver
       // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
       // @ts-ignore
       collapse: false,
+      exitOnError: false,
     })
       .run()
       .then(() => {
@@ -137,6 +139,13 @@ AWS Cost Saver
             )}`,
           );
         }
+      })
+      .catch(error => {
+        this.log(
+          `\n↓ Partially conserved, with ${chalk.red(
+            `${error.errors.length} errors`,
+          )}.`,
+        );
       });
   }
 }

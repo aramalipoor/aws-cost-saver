@@ -62,10 +62,7 @@ export class StopRdsDatabaseInstancesTrick
   ): Promise<void> {
     if (dryRun) {
       task.skip('Skipped due to dry-run');
-    } else if (
-      databaseState.status !== 'stopping' &&
-      databaseState.status !== 'stopped'
-    ) {
+    } else if (databaseState.status === 'available') {
       await this.rdsClient
         .stopDBInstance({
           DBInstanceIdentifier: databaseState.identifier,
@@ -73,7 +70,9 @@ export class StopRdsDatabaseInstancesTrick
         .promise();
       task.output = 'Stopped successfully';
     } else {
-      task.skip('Already stopped');
+      task.skip(
+        `Skipped, current state is not "available" it is "${databaseState.status}" instead`,
+      );
     }
   }
 
@@ -85,14 +84,23 @@ export class StopRdsDatabaseInstancesTrick
     if (dryRun) {
       task.skip('Skipped due to dry-run');
     } else if (databaseState.status === 'available') {
-      await this.rdsClient
-        .startDBInstance({
-          DBInstanceIdentifier: databaseState.identifier,
-        })
-        .promise();
-      task.output = 'Started successfully';
+      try {
+        await this.rdsClient
+          .startDBInstance({
+            DBInstanceIdentifier: databaseState.identifier,
+          })
+          .promise();
+        task.output = 'Started successfully';
+      } catch (error) {
+        if (error.code === 'InvalidDBInstanceState') {
+          task.skip('Skipped, database is not in "stopped" state.');
+        }
+        throw error;
+      }
     } else {
-
+      task.skip(
+        `Skipped, previous state was not "available" it was "${databaseState.status}" instead`,
+      );
     }
   }
 

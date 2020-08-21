@@ -37,7 +37,6 @@ export class StopFargateEcsServicesTrick
 
     for (const cluster of currentState) {
       for (const service of cluster.services) {
-        if (!service.arn.includes('frontend')) continue;
         subListr.add({
           title: `${chalk.blueBright(
             this.getEcsServiceResourceId(cluster.arn, service.arn),
@@ -46,12 +45,12 @@ export class StopFargateEcsServicesTrick
             new Listr(
               [
                 {
-                  title: 'Zero desired count',
+                  title: 'Desired count',
                   task: (ctx, task) =>
                     this.conserveService(task, dryRun, cluster, service),
                 },
                 {
-                  title: 'Disable auto scaling',
+                  title: 'Auto scaling',
                   task: (ctx, task) =>
                     this.conserveScalableTargets(
                       task,
@@ -66,6 +65,7 @@ export class StopFargateEcsServicesTrick
                 // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
                 // @ts-ignore
                 collapse: false,
+                exitOnError: false,
               },
             ),
         });
@@ -82,7 +82,6 @@ export class StopFargateEcsServicesTrick
   ): Promise<void> {
     for (const cluster of originalState) {
       for (const service of cluster.services) {
-        if (!service.arn.includes('frontend')) continue;
         subListr.add({
           title: `${chalk.blueBright(
             this.getEcsServiceResourceId(cluster.arn, service.arn),
@@ -91,12 +90,12 @@ export class StopFargateEcsServicesTrick
             new Listr(
               [
                 {
-                  title: 'ECS Tasks',
+                  title: 'Desired count',
                   task: (ctx, task) =>
                     this.restoreService(task, dryRun, cluster, service),
                 },
                 {
-                  title: 'Scalable Targets',
+                  title: 'Auto scaling',
                   task: (ctx, task) =>
                     this.restoreScalableTargets(task, dryRun, cluster, service),
                 },
@@ -106,6 +105,7 @@ export class StopFargateEcsServicesTrick
                 // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
                 // @ts-ignore
                 collapse: true,
+                exitOnError: false,
               },
             ),
         });
@@ -121,7 +121,7 @@ export class StopFargateEcsServicesTrick
   ): Promise<void> {
     if (dryRun) {
       task.skip('Skipped due to dry-run');
-    } else {
+    } else if (serviceState.desired > 0) {
       await this.ecsClient
         .updateService({
           cluster: clusterState.arn,
@@ -130,6 +130,8 @@ export class StopFargateEcsServicesTrick
         })
         .promise();
       task.output = 'Set desired count to 0';
+    } else {
+      task.skip(`Skipped, desired count is already zero`);
     }
   }
 
@@ -176,7 +178,7 @@ export class StopFargateEcsServicesTrick
   ): Promise<void> {
     if (dryRun) {
       task.skip(`Skipped due to dry-run`);
-    } else {
+    } else if (serviceState.desired > 0) {
       await this.ecsClient
         .updateService({
           cluster: clusterState.arn,
@@ -185,6 +187,8 @@ export class StopFargateEcsServicesTrick
         })
         .promise();
       task.output = `Restored desired count to ${serviceState.desired}`;
+    } else {
+      task.skip(`Skipped, desired count was previously zero`);
     }
   }
 

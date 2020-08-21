@@ -76,7 +76,7 @@ If you know about other tricks that can help developers community to save some m
 There are various ways to save money on AWS that need per-case judgement and it'll be hard to generalize into aws-cost-saver, but here is a list of useful resources:
 * [Google Search: "aws cost saving"](https://lmgtfy.com/?q=aws+cost+saving)
 * [Use Amazon EC2 Spot Instances to reduce EC2 costs for background and non-critical services](https://www.youtube.com/watch?v=7q5AeoKsGJw)
-* [Delete idle LBs, Use private subnets, Use auto-scalers](https://medium.com/@george_51059/reduce-aws-costs-74ef79f4f348)
+* [Delete idle LBs, Use private subnets, Use auto-scalers, etc.](https://medium.com/@george_51059/reduce-aws-costs-74ef79f4f348)
 
 # License
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)  
