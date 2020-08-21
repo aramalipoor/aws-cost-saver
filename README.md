@@ -66,3 +66,17 @@ Stopping AWS Fargate ECS services (i.e. tasks) will save compute-hour. This tric
 
 ### # stop-rds-databases
 Stopping RDS databases will save underlying EC2 instance costs. This trick will keep track of stopped databases in the state-file and start them again on restore.
+
+### # TODO
+If you know about other tricks that can help developers community to save some money feel free to create a Pull Request or raise an issue.
+
+# Alternatives
+There are various ways to save money on AWS that need per-case judgement and it'll be hard to generalize into aws-cost-saver, but here is a list of useful resources:
+* [Google Search: "aws cost saving"](https://lmgtfy.com/?q=aws+cost+saving)
+* [Use Amazon EC2 Spot Instances to reduce EC2 costs for background and non-critical services](https://www.youtube.com/watch?v=7q5AeoKsGJw)
+* [Delete idle LBs, Use private subnets, Use auto-scalers](https://medium.com/@george_51059/reduce-aws-costs-74ef79f4f348)
+
+# License
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)  
+
+AWS Cost Saver is licensed under MIT License. See [LICENSE](LICENSE) for the full license text.
