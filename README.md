@@ -3,14 +3,14 @@ aws-cost-saver
 
 A tiny CLI tool to help save costs in development environments when you're sleep and don't need them!
 
-**Disclaimer**: This utility is meant for **development** environments only where stopping and removing resources is not risky.
-
 * [Usage](#usage)
 * [Tricks](#tricks)
   * [shutdown-ec2-instances](#-shutdown-ec2-instances)
   * [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
-  * [remove-nat-gateways](#-remove-nat-gateways)
   * [stop-rds-databases](#-stop-rds-databases)
+
+### Disclaimer
+This utility is meant for **development** environments only where stopping and removing resources is not risky.
 
 # Usage
 ```sh-session
@@ -37,7 +37,9 @@ OPTIONS
   -p, --profile          (default: default) AWS profile to lookup from ~/.aws/config
 ```
 
-![Example Screenshot](./assets/example-screenshot.png "conserve")
+<p align="center">
+  <img width="460" src="./assets/example-screenshot.png" />
+</p>
 
 ### Restore
 
