@@ -2,6 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "importHelpers": true,
+    "esModuleInterop": true,
     "module": "commonjs",
     "outDir": "lib",
     "rootDir": "src",

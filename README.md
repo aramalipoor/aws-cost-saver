@@ -1,29 +1,25 @@
-aws-cost-saver (work-in-progress)
+aws-cost-saver
 =======================
 
 A tiny CLI tool to help save costs in development environments when you're sleep and don't need them!
 
-<!-- toc -->
+**Disclaimer**: This utility is meant for **development** environments only where stopping and removing resources is not risky.
+
 * [Usage](#usage)
 * [Tricks](#tricks)
-  * [remove-ec2-eips](#-remove-ec2-eips)
   * [shutdown-ec2-instances](#-shutdown-ec2-instances)
-  * [stop-fargate-ecs-tasks](#-stop-fargate-ecs-tasks)
+  * [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
+  * [remove-nat-gateways](#-remove-nat-gateways)
   * [stop-rds-databases](#-stop-rds-databases)
-<!-- tocstop -->
 
 # Usage
-<!-- usage -->
 ```sh-session
 $ npm install -g aws-cost-saver
 ```
-<!-- usagestop -->
 ## Commands
-Under the hood [aws-sdk](https://github.com/aws/aws-sdk-js) is used, therefore AWS Credentials are read from `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` environment variables.
-
-<!-- commands -->
-* [`aws-cost-saver conserve [-t|--tag Key=Value] [-s|--state-file aws-cost-saver-state.json]`](#conserve)
-* [`aws-cost-saver restore [-s|--state-file aws-cost-saver-state.json]`](#restore)
+Under the hood [aws-sdk](https://github.com/aws/aws-sdk-js) is used, therefore AWS Credentials are read in this order:
+1. From `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION` environment variables.
+2. From shared ini file (i.e. `~/.aws/credentials`)
 
 ### Conserve
 
@@ -31,40 +27,43 @@ This command uses [various tricks](#tricks) to conserve as much money as possibl
 
 ```
 USAGE
-  $ aws-cost-saver conserve [-t|--tag Key=Value] [-s|--state-file aws-cost-saver-state.json]
+  $ aws-cost-saver conserve [-d|--dry-run] [-s|--state-file aws-cost-saver.json] [-r|--region eu-central-1] [-p|--profile default]
 
 OPTIONS
-  -h, --help             show CLI help
-  -t, --tag Team=Tacos   filter to resources matching this tag only
+  -h, --help             Show CLI help.
+  -d, --dry-run          Only list actions and do not actually execute them.
+  -s, --state-file       (default: aws-cost-saver.json) Path to save current state of your AWS resources.
+  -r, --region           (default: eu-central-1) AWS region to look up and save resoruces.
+  -p, --profile          (default: default) AWS profile to lookup from ~/.aws/config
 ```
 
 ### Restore
 
-To restore AWS resources stopped by the [conserve](#conserve) command
+To restore AWS resources stopped or removed by the [conserve](#conserve) command.
 
 ```
 USAGE
-  $ aws-cost-saver restore [-s|--state-file aws-cost-saver-state.json]
+  $ aws-cost-saver restore [-d|--dry-run] [-s|--state-file aws-cost-saver.json] [-r|--region eu-central-1] [-p|--profile default]
 
 OPTIONS
-  -h, --help       show CLI help
+  -h, --help             Show CLI help.
+  -d, --dry-run          Only list actions and do not actually execute them.
+  -s, --state-file       (default: aws-cost-saver.json) Path to load previous state of your AWS resources from.
+  -r, --region           (default: eu-central-1) AWS region to restore resoruces in.
+  -p, --profile          (default: default) AWS profile to lookup from ~/.aws/config
 ```
-<!-- commandsstop -->
-
-## state-file
-aws-cost-saver uses a state-file to keep track of actions performed to save costs so it can be used by [restore](#restore) command. 
 
 # Tricks
 Here is a list of tricks aws-cost-saver uses to reduce AWS costs when you don't need them.
 
-### # remove-ec2-eips
-Each EIP costs money so we can detach and remove them from EC2 instances when not needed. This trick will keep track of removed EIP addresses in the state-file and add them back on restore.
-
 ### # shutdown-ec2-instances
 Stopping running EC2 instances will save compute-hour. This trick will keep track of stopped EC2 instances in the state-file and start them again on restore.
 
-### # stop-fargate-ecs-tasks
-Stopping AWS Fargate ECS tasks will save compute-hour. This trick will keep track of stopped Fargate ECS tasks in the state-file and start them again on restore.
+### # stop-fargate-ecs-services
+Stopping AWS Fargate ECS services (i.e. tasks) will save compute-hour. This trick will keep track of stopped Fargate ECS services in the state-file and start them again on restore.
+
+### # remove-nat-gateways
+Each NAT gateway costs money so we can delete when not needed. This trick will keep track of removed NAT gateways and the subnets they were in and create them again on restore.
 
 ### # stop-rds-databases
 Stopping RDS databases will save underlying EC2 instance costs. This trick will keep track of stopped databases in the state-file and start them again on restore.

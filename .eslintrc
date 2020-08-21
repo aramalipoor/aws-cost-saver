@@ -1,6 +1,7 @@
 {
   "rules": {
-    "no-warning-comments": "off"
+    "no-warning-comments": "off",
+    "no-await-in-loop": "off"
   },
   "extends": [
     "oclif",
