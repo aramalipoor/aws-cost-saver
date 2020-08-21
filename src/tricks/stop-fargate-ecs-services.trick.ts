@@ -37,6 +37,7 @@ export class StopFargateEcsServicesTrick
 
     for (const cluster of currentState) {
       for (const service of cluster.services) {
+        if (!service.arn.includes('frontend')) continue;
         subListr.add({
           title: `${chalk.blueBright(
             this.getEcsServiceResourceId(cluster.arn, service.arn),
@@ -81,8 +82,11 @@ export class StopFargateEcsServicesTrick
   ): Promise<void> {
     for (const cluster of originalState) {
       for (const service of cluster.services) {
+        if (!service.arn.includes('frontend')) continue;
         subListr.add({
-          title: `${this.getEcsServiceResourceId(cluster.arn, service.arn)}`,
+          title: `${chalk.blueBright(
+            this.getEcsServiceResourceId(cluster.arn, service.arn),
+          )}`,
           task: () =>
             new Listr(
               [
@@ -135,7 +139,10 @@ export class StopFargateEcsServicesTrick
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
   ): Promise<void> {
-    if (!serviceState.scalableTargets) {
+    if (
+      !serviceState.scalableTargets ||
+      serviceState.scalableTargets.length === 0
+    ) {
       task.skip('No scalable targets defined');
       return;
     }
@@ -187,7 +194,10 @@ export class StopFargateEcsServicesTrick
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
   ): Promise<void> {
-    if (!serviceState.scalableTargets) {
+    if (
+      !serviceState.scalableTargets ||
+      serviceState.scalableTargets.length === 0
+    ) {
       task.skip('No scalable targets defined');
       return;
     }

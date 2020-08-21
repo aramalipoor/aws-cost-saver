@@ -84,13 +84,15 @@ export class StopRdsDatabaseInstancesTrick
   ): Promise<void> {
     if (dryRun) {
       task.skip('Skipped due to dry-run');
-    } else {
+    } else if (databaseState.status === 'available') {
       await this.rdsClient
         .startDBInstance({
           DBInstanceIdentifier: databaseState.identifier,
         })
         .promise();
       task.output = 'Started successfully';
+    } else {
+
     }
   }
 

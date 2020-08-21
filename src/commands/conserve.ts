@@ -55,7 +55,7 @@ export default class Conserve extends Command {
           type: 'confirm',
           default: false,
           message: `Are you sure you want to ${chalk.bgRed(
-            chalk.black('OVERWRITE'),
+            chalk.white('OVERWRITE'),
           )} existing state-file?\n  You will not be able to restore to previously conserved resources!`,
         },
       ]);

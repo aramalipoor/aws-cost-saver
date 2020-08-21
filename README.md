@@ -37,6 +37,8 @@ OPTIONS
   -p, --profile          (default: default) AWS profile to lookup from ~/.aws/config
 ```
 
+![Example Screenshot](./assets/example-screenshot.png "conserve")
+
 ### Restore
 
 To restore AWS resources stopped or removed by the [conserve](#conserve) command.
@@ -61,9 +63,6 @@ Stopping running EC2 instances will save compute-hour. This trick will keep trac
 
 ### # stop-fargate-ecs-services
 Stopping AWS Fargate ECS services (i.e. tasks) will save compute-hour. This trick will keep track of stopped Fargate ECS services in the state-file and start them again on restore.
-
-### # remove-nat-gateways
-Each NAT gateway costs money so we can delete when not needed. This trick will keep track of removed NAT gateways and the subnets they were in and create them again on restore.
 
 ### # stop-rds-databases
 Stopping RDS databases will save underlying EC2 instance costs. This trick will keep track of stopped databases in the state-file and start them again on restore.

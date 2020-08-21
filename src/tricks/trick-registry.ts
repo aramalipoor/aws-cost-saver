@@ -15,7 +15,9 @@ export class TrickRegistry {
       new StopFargateEcsServicesTrick(),
       new StopRdsDatabaseInstancesTrick(),
       new ShutdownEC2InstancesTrick(),
-      new RemoveNatGatewaysTrick(),
+
+      // FIXME Removing NAT Gateway will confuse IaC like terraform to create a redundant gateway
+      // new RemoveNatGatewaysTrick(),
     );
 
     return registry;
