@@ -75,7 +75,7 @@ Stopping RDS databases will save underlying EC2 instance costs. This trick will 
 Provisioned RCU and WCU on DynamoDB tables costs hourly. This trick will decrease them to minimum value (i.e. 1). Original values will be stored in state-file to be restored later.
 
 ### # TODO
-If you know about other tricks that can help developers community to save some money feel free to create a Pull Request or raise an issue.
+If you know any other tricks to save some money feel free to create a Pull Request or raise an issue.
 
 # Alternatives
 There are various ways to save money on AWS that need per-case judgement and it'll be hard to generalize into aws-cost-saver, but here is a list of useful resources:
