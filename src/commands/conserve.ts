@@ -1,6 +1,6 @@
 import Command, { flags } from '@oclif/command';
 import { writeFileSync, existsSync } from 'fs';
-import Listr, { ListrTask } from 'listr';
+import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 import inquirer from 'inquirer';
 
 import { TrickRegistry } from '../tricks/trick-registry';
@@ -9,7 +9,7 @@ import chalk from 'chalk';
 
 export default class Conserve extends Command {
   static description =
-    'This command uses various tricks to conserve as much money as possible. To restore, this command will create a `aws-cost-saver-state.json` file to be use by "restore"';
+    'This command uses various tricks to conserve as much money as possible. To restore, this command will create a `aws-cost-saver.json` file to be use by "restore"';
 
   static examples = [
     `$ aws-cost-saver conserve`,
@@ -62,7 +62,7 @@ export default class Conserve extends Command {
 
       if (!answers.stateFileOverwrite) {
         this.log(
-          chalk.redBright('Ignoring converse to avoid overwriting state file!'),
+          chalk.redBright('Ignoring conserve to avoid overwriting state file!'),
         );
         return;
       }
@@ -77,6 +77,7 @@ AWS Cost Saver
   Action: ${chalk.green('conserve')}
   AWS Region: ${chalk.green(awsRegion)}
   AWS Profile: ${chalk.green(awsProfile)}
+  Dry Run: ${flags['dry-run'] ? chalk.green('yes') : chalk.yellow('no')}
 `);
 
     const tricksRegistry = TrickRegistry.initialize();
@@ -86,7 +87,7 @@ AWS Cost Saver
     for (const trick of tricksRegistry.all()) {
       taskList.push({
         title: `${trick.getDisplayName()}`,
-        task: async (ctx, task) => {
+        task: async (ctx, task: ListrTaskWrapper<any>) => {
           const subListr = new Listr([], {
             concurrent: false,
             // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
@@ -95,23 +96,20 @@ AWS Cost Saver
             exitOnError: false,
           });
 
-          await trick
-            .conserve(subListr, flags['dry-run'])
-            .then(result => {
-              stateRoot[trick.getMachineName()] = result;
+          await trick.conserve(subListr, flags['dry-run']).then(result => {
+            stateRoot[trick.getMachineName()] = result;
 
-              if (Array.isArray(result) && result.length === 0) {
-                task.skip('No resources found');
-              }
-            })
-            .catch(task.report);
+            if (!result || (Array.isArray(result) && result.length === 0)) {
+              task.skip('No resources found');
+            }
+          });
 
           return subListr;
         },
         // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
         // @ts-ignore
         collapse: false,
-      });
+      } as ListrTask);
     }
 
     await new Listr(taskList, {
@@ -141,11 +139,19 @@ AWS Cost Saver
         }
       })
       .catch(error => {
-        this.log(
-          `\n↓ Partially conserved, with ${chalk.red(
-            `${error.errors.length} errors`,
-          )}.`,
-        );
+        if (error.errors.length < taskList.length) {
+          this.log(
+            `\n↓ Partially conserved, with ${chalk.red(
+              `${error.errors.length} error(s)`,
+            )}.`,
+          );
+        } else {
+          this.log(
+            `\n↓ All ${chalk.red(
+              `${error.errors.length} tricks failed`,
+            )} with errors.`,
+          );
+        }
       });
   }
 }
