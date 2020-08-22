@@ -45,8 +45,9 @@ export default class Restore extends Command {
 AWS Cost Saver
 --------------
   Action: ${chalk.green('restore')}
-  AWS Region: ${chalk.green(awsRegion)}
-  AWS Profile: ${chalk.green(awsProfile)}
+  AWS region: ${chalk.green(awsRegion)}
+  AWS profile: ${chalk.green(awsProfile)}
+  State file: ${chalk.green(flags['state-file'])}
 `);
 
     const tricksRegistry = TrickRegistry.initialize();
@@ -60,10 +61,9 @@ AWS Cost Saver
         task: async (ctx, task) => {
           const subListr = new Listr([], {
             concurrent: false,
-            // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+            exitOnError: false,
             // @ts-ignore
             collapse: false,
-            exitOnError: false,
           });
 
           if (rootState[trick.getMachineName()]) {
@@ -75,16 +75,15 @@ AWS Cost Saver
               )
               .catch(task.report);
           } else {
-            task.skip('No EC2 instances was conserved previously.');
+            task.skip('Nothing was conserved previously.');
           }
 
           return subListr;
         },
-        // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+        exitOnError: false,
         // @ts-ignore
         collapse: false,
-        exitOnError: false,
-      });
+      } as ListrTask);
     }
 
     await new Listr(taskList, {
@@ -111,7 +110,7 @@ AWS Cost Saver
       })
       .catch(error => {
         this.log(
-          `\n↓ Partially restored, with ${chalk.red(
+          `\n${chalk.yellow('✔')} Partially restored, with ${chalk.red(
             `${error.errors.length} errors`,
           )}.`,
         );

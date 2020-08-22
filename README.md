@@ -8,6 +8,7 @@ A tiny CLI tool to help save costs in development environments when you're aslee
   * [shutdown-ec2-instances](#-shutdown-ec2-instances)
   * [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
   * [stop-rds-databases](#-stop-rds-databases)
+  * [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -68,6 +69,9 @@ Stopping AWS Fargate ECS services (i.e. tasks) will save compute-hour. This tric
 
 ### # stop-rds-databases
 Stopping RDS databases will save underlying EC2 instance costs. This trick will keep track of stopped databases in the state-file and start them again on restore.
+
+### # decrease-dynamodb-provisioned-rcu-wcu
+Provisioned RCU and WCU costs hourly on DynamoDB tables. This trick will decrease them to minimum value (i.e. 1). Original provisioned RCU and WCU will be stored in state-file.
 
 ### # TODO
 If you know about other tricks that can help developers community to save some money feel free to create a Pull Request or raise an issue.

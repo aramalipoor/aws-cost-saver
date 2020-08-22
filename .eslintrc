@@ -1,7 +1,8 @@
 {
   "rules": {
     "no-warning-comments": "off",
-    "no-await-in-loop": "off"
+    "no-await-in-loop": "off",
+    "@typescript-eslint/ban-ts-ignore": "off"
   },
   "extends": [
     "oclif",
