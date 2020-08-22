@@ -1,7 +1,7 @@
 aws-cost-saver
 =======================
 
-A tiny CLI tool to help save costs in development environments when you're sleep and don't need them!
+A tiny CLI tool to help save costs in development environments when you're asleep and don't need them!
 
 * [Usage](#usage)
 * [Tricks](#tricks)
