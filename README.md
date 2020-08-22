@@ -8,6 +8,7 @@ A tiny CLI tool to help save costs in development environments when you're aslee
   * [shutdown-ec2-instances](#-shutdown-ec2-instances)
   * [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
   * [stop-rds-databases](#-stop-rds-databases)
+  * [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -27,14 +28,15 @@ This command uses [various tricks](#tricks) to conserve as much money as possibl
 
 ```
 USAGE
-  $ aws-cost-saver conserve [-d|--dry-run] [-s|--state-file aws-cost-saver.json] [-r|--region eu-central-1] [-p|--profile default]
+  $ aws-cost-saver conserve [-d|--dry-run] [-s|--state-file aws-cost-saver.json] [-i|--no-state-file] [-r|--region eu-central-1] [-p|--profile default]
 
 OPTIONS
-  -h, --help             Show CLI help.
-  -d, --dry-run          Only list actions and do not actually execute them.
-  -s, --state-file       (default: aws-cost-saver.json) Path to save current state of your AWS resources.
-  -r, --region           (default: eu-central-1) AWS region to look up and save resoruces.
-  -p, --profile          (default: default) AWS profile to lookup from ~/.aws/config
+  -h, --help            Show CLI help.
+  -d, --dry-run         Only list actions and do not actually execute them.
+  -s, --state-file      (default: aws-cost-saver.json) Path to save current state of your AWS resources.
+  -n, --no-state-file   (default: false) Do not keep original state, just conserve as much money as possible.
+  -r, --region          (default: eu-central-1) AWS region to look up and save resoruces.
+  -p, --profile         (default: default) AWS profile to lookup from ~/.aws/config
 ```
 
 <p align="center">
@@ -68,6 +70,9 @@ Stopping AWS Fargate ECS services (i.e. tasks) will save compute-hour. This tric
 
 ### # stop-rds-databases
 Stopping RDS databases will save underlying EC2 instance costs. This trick will keep track of stopped databases in the state-file and start them again on restore.
+
+### # decrease-dynamodb-provisioned-rcu-wcu
+Provisioned RCU and WCU on DynamoDB tables costs hourly. This trick will decrease them to minimum value (i.e. 1). Original values will be stored in state-file to be restored later.
 
 ### # TODO
 If you know about other tricks that can help developers community to save some money feel free to create a Pull Request or raise an issue.

@@ -2,8 +2,9 @@ import { TrickInterface } from '../interfaces/trick.interface';
 
 import { StopFargateEcsServicesTrick } from './stop-fargate-ecs-services.trick';
 import { StopRdsDatabaseInstancesTrick } from './stop-rds-database-instances.trick';
-// import { RemoveNatGatewaysTrick } from './remove-nat-gateways.trick';
 import { ShutdownEC2InstancesTrick } from './shutdown-ec2-instances.trick';
+import { DecreaseDynamoDBProvisionedRcuWcuTrick } from './decrease-dynamodb-provisioved-rcu-wcu.trick';
+// import { RemoveNatGatewaysTrick } from './remove-nat-gateways.trick';
 
 export class TrickRegistry {
   private registry: TrickInterface<any>[] = [];
@@ -15,6 +16,7 @@ export class TrickRegistry {
       new StopFargateEcsServicesTrick(),
       new StopRdsDatabaseInstancesTrick(),
       new ShutdownEC2InstancesTrick(),
+      new DecreaseDynamoDBProvisionedRcuWcuTrick(),
 
       // FIXME Removing NAT Gateway will confuse IaC like terraform to create a redundant gateway
       // new RemoveNatGatewaysTrick(),

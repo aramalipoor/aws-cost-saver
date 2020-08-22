@@ -30,7 +30,13 @@ export default class Conserve extends Command {
       char: 's',
       default: 'aws-cost-saver.json',
       description:
-        'Where to keep original state of stopped resources to restore later.',
+        'Where to keep original state of stopped/decreased resources to restore later.',
+    }),
+    'no-state-file': flags.boolean({
+      char: 'n',
+      default: false,
+      description:
+        'Ignore saving original state, just try to conserve as much money as possible.',
     }),
   };
 
@@ -41,7 +47,11 @@ export default class Conserve extends Command {
 
     const awsConfig = await configureAWS(flags.profile, flags.region);
 
-    if (!flags['dry-run'] && existsSync(flags['state-file'])) {
+    if (
+      !flags['dry-run'] &&
+      !flags['no-state-file'] &&
+      existsSync(flags['state-file'])
+    ) {
       this.log(
         chalk.yellow(
           `\n→ State file already exists: ${chalk.yellowBright(
@@ -62,7 +72,7 @@ export default class Conserve extends Command {
 
       if (!answers.stateFileOverwrite) {
         this.log(
-          chalk.redBright('Ignoring conserve to avoid overwriting state file!'),
+          chalk.redBright('\nIgnoring, to avoid overwriting state file!'),
         );
         return;
       }
@@ -75,9 +85,14 @@ export default class Conserve extends Command {
 AWS Cost Saver
 --------------
   Action: ${chalk.green('conserve')}
-  AWS Region: ${chalk.green(awsRegion)}
-  AWS Profile: ${chalk.green(awsProfile)}
-  Dry Run: ${flags['dry-run'] ? chalk.green('yes') : chalk.yellow('no')}
+  AWS region: ${chalk.green(awsRegion)}
+  AWS profile: ${chalk.green(awsProfile)}
+  State file: ${
+    flags['no-state-file']
+      ? chalk.yellow('none')
+      : chalk.green(flags['state-file'])
+  }
+  Dry run: ${flags['dry-run'] ? chalk.green('yes') : chalk.yellow('no')}
 `);
 
     const tricksRegistry = TrickRegistry.initialize();
@@ -90,10 +105,9 @@ AWS Cost Saver
         task: async (ctx, task: ListrTaskWrapper<any>) => {
           const subListr = new Listr([], {
             concurrent: false,
-            // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+            exitOnError: false,
             // @ts-ignore
             collapse: false,
-            exitOnError: false,
           });
 
           await trick.conserve(subListr, flags['dry-run']).then(result => {
@@ -106,7 +120,6 @@ AWS Cost Saver
 
           return subListr;
         },
-        // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
         // @ts-ignore
         collapse: false,
       } as ListrTask);
@@ -114,41 +127,48 @@ AWS Cost Saver
 
     await new Listr(taskList, {
       concurrent: true,
-      // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+      exitOnError: false,
       // @ts-ignore
       collapse: false,
-      exitOnError: false,
     })
       .run()
-      .then(() => {
-        if (flags['dry-run']) {
-          this.log(
-            `\n${chalk.yellow(' ↓ Skipped saving state due to dry-run.')}`,
-          );
-        } else {
+      .finally(() => {
+        if (!flags['dry-run'] && !flags['no-state-file']) {
           writeFileSync(
             flags['state-file'],
             JSON.stringify(stateRoot, null, 2),
             'utf-8',
           );
           this.log(
-            `\n ${chalk.green('✔')} Successfully saved state: ${chalk.green(
+            `\n  ${chalk.green('❯')} Wrote state file to ${chalk.green(
               flags['state-file'],
             )}`,
           );
         }
       })
+      .then(() => {
+        if (flags['dry-run']) {
+          this.log(`\n${chalk.yellow(' ↓ Skipped conserve due to dry-run.')}`);
+        } else {
+          this.log(`\n ${chalk.green('✔')} Successfully conserved.`);
+        }
+      })
       .catch(error => {
         if (error.errors.length < taskList.length) {
+          writeFileSync(
+            flags['state-file'],
+            JSON.stringify(stateRoot, null, 2),
+            'utf-8',
+          );
           this.log(
-            `\n↓ Partially conserved, with ${chalk.red(
+            `\n${chalk.yellow('✔')} Partially conserved, with ${chalk.red(
               `${error.errors.length} error(s)`,
             )}.`,
           );
         } else {
           this.log(
-            `\n↓ All ${chalk.red(
-              `${error.errors.length} tricks failed`,
+            `\n${chalk.red('✖')} All ${chalk.red(
+              `${taskList.length} tricks failed`,
             )} with errors.`,
           );
         }
