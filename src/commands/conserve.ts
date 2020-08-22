@@ -30,13 +30,13 @@ export default class Conserve extends Command {
       char: 's',
       default: 'aws-cost-saver.json',
       description:
-        'Where to keep original state of stopped resources to restore later.',
+        'Where to keep original state of stopped/decreased resources to restore later.',
     }),
-    'ignore-state-file': flags.boolean({
-      char: 'i',
+    'no-state-file': flags.boolean({
+      char: 'n',
       default: false,
       description:
-        'Ignoring saving a state, just try to conserve as much as possible',
+        'Ignore saving original state, just try to conserve as much money as possible.',
     }),
   };
 
@@ -49,7 +49,7 @@ export default class Conserve extends Command {
 
     if (
       !flags['dry-run'] &&
-      !flags['ignore-state-file'] &&
+      !flags['no-state-file'] &&
       existsSync(flags['state-file'])
     ) {
       this.log(
@@ -88,7 +88,7 @@ AWS Cost Saver
   AWS region: ${chalk.green(awsRegion)}
   AWS profile: ${chalk.green(awsProfile)}
   State file: ${
-    flags['ignore-state-file']
+    flags['no-state-file']
       ? chalk.yellow('none')
       : chalk.green(flags['state-file'])
   }
@@ -133,7 +133,7 @@ AWS Cost Saver
     })
       .run()
       .finally(() => {
-        if (!flags['dry-run'] && !flags['ignore-state-file']) {
+        if (!flags['dry-run'] && !flags['no-state-file']) {
           writeFileSync(
             flags['state-file'],
             JSON.stringify(stateRoot, null, 2),
