@@ -28,7 +28,7 @@ This command uses [various tricks](#tricks) to conserve as much money as possibl
 
 ```
 USAGE
-  $ aws-cost-saver conserve [-d|--dry-run] [-s|--state-file aws-cost-saver.json] [-i|--no-state-file] [-r|--region eu-central-1] [-p|--profile default]
+  $ aws-cost-saver conserve [-d|--dry-run] [-s|--state-file aws-cost-saver.json] [-n|--no-state-file] [-r|--region eu-central-1] [-p|--profile default]
 
 OPTIONS
   -h, --help            Show CLI help.
