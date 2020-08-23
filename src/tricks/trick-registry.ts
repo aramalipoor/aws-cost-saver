@@ -5,6 +5,7 @@ import { StopRdsDatabaseInstancesTrick } from './stop-rds-database-instances.tri
 import { ShutdownEC2InstancesTrick } from './shutdown-ec2-instances.trick';
 import { DecreaseDynamoDBProvisionedRcuWcuTrick } from './decrease-dynamodb-provisioved-rcu-wcu.trick';
 import { RemoveNatGatewaysTrick } from './remove-nat-gateways.trick';
+import { SnapshotRemoveElasticacheRedisTrick } from './snapshot-remove-elasticache-redis.trick';
 
 export class TrickRegistry {
   private registry: TrickInterface<any>[] = [];
@@ -18,6 +19,7 @@ export class TrickRegistry {
       new ShutdownEC2InstancesTrick(),
       new DecreaseDynamoDBProvisionedRcuWcuTrick(),
       new RemoveNatGatewaysTrick(),
+      new SnapshotRemoveElasticacheRedisTrick(),
     );
 
     return registry;
