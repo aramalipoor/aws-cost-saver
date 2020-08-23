@@ -7,9 +7,9 @@ A tiny CLI tool to help save costs in development environments when you're aslee
 * [Tricks](#tricks)
   * [shutdown-ec2-instances](#-shutdown-ec2-instances)
   * [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
-  * [stop-rds-databases](#-stop-rds-databases)
+  * [stop-rds-database-instances](#-stop-rds-database-instances)
   * [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
-  * [remove-nat-gateway](#-remove-nat-gateway)
+  * [remove-nat-gateways](#-remove-nat-gateways)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -74,13 +74,13 @@ Stopping running EC2 instances will save compute-hour. This trick will keep trac
 ### # stop-fargate-ecs-services
 Stopping AWS Fargate ECS services (i.e. tasks) will save compute-hour. This trick will keep track of stopped Fargate ECS services in the state-file and start them again on restore.
 
-### # stop-rds-databases
+### # stop-rds-database-instances
 Stopping RDS databases will save underlying EC2 instance costs. This trick will keep track of stopped databases in the state-file and start them again on restore.
 
 ### # decrease-dynamodb-provisioned-rcu-wcu
 Provisioned RCU and WCU on DynamoDB tables costs hourly. This trick will decrease them to minimum value (i.e. 1). Original values will be stored in state-file to be restored later.
 
-### # remove-nat-gateway
+### # remove-nat-gateways
 NAT Gateways are charged hourly. This trick will remove NAT Gateways while you don't use your services, and creates them again on "restore" command.
 
 * Removing NAT Gateways stops instances access to internet.
