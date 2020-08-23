@@ -1,4 +1,4 @@
-## [0.0.8](https://github.com/aramalipoor/aws-cost-saver) (XXXX-XX-XX)
+## [0.0.8](https://github.com/aramalipoor/aws-cost-saver) (2020-08-23)
 * Add decrease-kinesis-streams-shards trick ([#13](https://github.com/aramalipoor/aws-cost-saver/pull/13))
 
 ## [0.0.7](https://github.com/aramalipoor/aws-cost-saver) (2020-08-23)

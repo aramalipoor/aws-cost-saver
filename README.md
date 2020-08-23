@@ -5,13 +5,13 @@ A tiny CLI tool to help save costs in development environments when you're aslee
 
 * [Usage](#usage)
 * [Tricks](#tricks)
-  * [shutdown-ec2-instances](#-shutdown-ec2-instances)
-  * [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
-  * [stop-rds-database-instances](#-stop-rds-database-instances)
-  * [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
-  * [remove-nat-gateways](#-remove-nat-gateways)
-  * [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
-  * [decrease-kinesis-streams-shards](#-decrease-kinesis-streams-shards)
+  1. [shutdown-ec2-instances](#-shutdown-ec2-instances)
+  2. [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
+  3. [stop-rds-database-instances](#-stop-rds-database-instances)
+  4. [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
+  5. [remove-nat-gateways](#-remove-nat-gateways)
+  6. [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
+  7. [decrease-kinesis-streams-shards](#-decrease-kinesis-streams-shards)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -19,6 +19,8 @@ This utility is meant for **development** environments only where stopping and r
 # Usage
 ```sh-session
 $ npm install -g aws-cost-saver
+
+$ aws-cost-saver conserve --help
 $ aws-cost-saver conserve --dry-run
 ```
 ## Commands
