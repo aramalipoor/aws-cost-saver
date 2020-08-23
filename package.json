@@ -1,7 +1,7 @@
 {
   "name": "aws-cost-saver",
   "description": "A tiny CLI tool to help save costs in development environments when you're asleep and don't need them!",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "author": "aramalipoor",
   "bin": {
     "aws-cost-saver": "./bin/run"
@@ -11,36 +11,36 @@
     "@oclif/command": "^1.8.0",
     "@oclif/config": "^1.17.0",
     "@oclif/plugin-help": "^3.2.0",
-    "tslib": "^1.13.0",
     "aws-sdk": "^2.730.0",
     "chalk": "^4.1.0",
     "cli-ux": "^5.4.10",
     "inquirer": "^7.3.3",
     "listr": "^0.14.3",
-    "lodash": "^4.17.19"
+    "lodash": "^4.17.19",
+    "tslib": "^1.13.0"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1.22.2",
     "@oclif/test": "^1.2.6",
+    "@types/aws-sdk": "^2.7.0",
     "@types/chai": "^4.2.12",
+    "@types/inquirer": "^7.3.1",
+    "@types/listr": "^0.14.2",
+    "@types/lodash": "^4.14.159",
     "@types/mocha": "^5.2.7",
     "@types/node": "^10.17.28",
     "chai": "^4.2.0",
     "eslint": "^5.16.0",
     "eslint-config-oclif": "^3.1.0",
     "eslint-config-oclif-typescript": "^0.1.0",
+    "eslint-config-prettier": "^6.7.0",
+    "eslint-plugin-prettier": "^3.1.1",
     "globby": "^10.0.2",
     "mocha": "^5.2.0",
     "nyc": "^14.1.1",
+    "prettier": "^1.19.1",
     "ts-node": "^8.10.2",
-    "typescript": "^3.9.7",
-    "@types/aws-sdk": "^2.7.0",
-    "@types/inquirer": "^7.3.1",
-    "@types/listr": "^0.14.2",
-    "@types/lodash": "^4.14.159",
-    "eslint-config-prettier": "^6.7.0",
-    "eslint-plugin-prettier": "^3.1.1",
-    "prettier": "^1.19.1"
+    "typescript": "^3.9.7"
   },
   "engines": {
     "node": ">=8.0.0"
