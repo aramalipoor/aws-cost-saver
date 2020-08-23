@@ -37,8 +37,8 @@ OPTIONS
   -d, --dry-run                          Only print actions and write state-file of current resources.
   -n, --no-state-file                    Ignore saving current state, useful when want to only conserve as much money as possible.
   -s, --state-file state-file.json       [default: aws-cost-saver.json] Where to keep original state of stopped/decreased resources to restore later.
-  -u, --use-trick trick-machine-name     Enables an individual trick. Useful for tricks that are disabled by default.
-  -i, --ignore-trick trick-machine-name  Disables an individual trick. Useful when you do not like to use a specific trick.
+  -u, --use-trick trick-machine-name     Enables an individual trick. Useful for tricks that are disabled by default. Can be used multiple times.
+  -i, --ignore-trick trick-machine-name  Disables an individual trick. Useful when you do not like to use a specific trick. Can be used multiple times.
   --no-default-tricks                    Disables all default tricks. Useful alongside --use-trick to enable only specific set of tricks.
   -r, --region eu-central-1              [default: eu-central-1] AWS Region to converse resources in
   -p, --profile my-aws-profile           [default: default] AWS Profile to use from ~/.aws/config
@@ -92,8 +92,8 @@ $ aws-cost-saver conserve --use-trick remove-nat-gateways
 ### # snapshot-and-remove-elasticache-clusters
 ElastiCache clusters cost hourly but unfortunately it's not possible to stop them like an EC2 instance. To save costs this trick will take a snapshot of current cluster (preserving data, config and cluster ID) and delete it. To restore it'll create a new cluster based on snapshot taken. 
 
-* Due to limitation on AWS, backup and restore is supported only for clusters running on Redis.
-* This trick is currently _disabled by default_ to be tested by early users. Use `--use-trick` flag to explicitly enable it:
+* Due to AWS limitation, backup and restore is supported only for clusters running on Redis.
+* This trick is currently **disabled by default** to be tested by early users. Use `--use-trick` flag to explicitly enable it:
 ```sh
 $ aws-cost-saver conserve --use-trick snapshot-remove-elasticache-redis
 ```
