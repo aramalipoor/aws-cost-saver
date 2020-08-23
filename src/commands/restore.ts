@@ -89,10 +89,9 @@ AWS Cost Saver
     await new Listr(taskList, {
       concurrent: true,
       renderer: 'default',
-      // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+      exitOnError: false,
       // @ts-ignore
       collapse: false,
-      exitOnError: false,
     })
       .run()
       .then(() => {

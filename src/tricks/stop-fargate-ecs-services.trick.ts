@@ -61,11 +61,10 @@ export class StopFargateEcsServicesTrick
                 },
               ],
               {
+                exitOnError: false,
                 concurrent: true,
-                // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
                 // @ts-ignore
                 collapse: false,
-                exitOnError: false,
               },
             ),
         });
@@ -101,11 +100,10 @@ export class StopFargateEcsServicesTrick
                 },
               ],
               {
+                exitOnError: false,
                 concurrent: true,
-                // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
                 // @ts-ignore
                 collapse: true,
-                exitOnError: false,
               },
             ),
         });
@@ -296,7 +294,6 @@ export class StopFargateEcsServicesTrick
     const result = [];
 
     for (const services of chunks) {
-      // eslint-disable-next-line no-await-in-loop
       const response = await this.ecsClient
         .describeServices({ services, cluster: clusterArn })
         .promise();
