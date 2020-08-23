@@ -12,9 +12,15 @@ export default class Restore extends Command {
 
   static examples = [
     `$ aws-cost-saver restore`,
-    `$ aws-cost-saver restore --dry-run`,
-    `$ aws-cost-saver restore --region eu-central-1 --profile my-aws-profile`,
-    `$ aws-cost-saver restore --state-file new-path.json`,
+    `$ aws-cost-saver restore ${chalk.yellow('--dry-run')}`,
+    `$ aws-cost-saver restore ${chalk.yellow(
+      `--region ${chalk.bold(`eu-central-1`)} --profile ${chalk.bold(
+        `my-aws-profile`,
+      )}`,
+    )}`,
+    `$ aws-cost-saver restore ${chalk.yellow(
+      `--state-file ${chalk.bold(`another-path.json`)}`,
+    )}`,
   ];
 
   static flags = {
@@ -52,7 +58,7 @@ AWS Cost Saver
 
     const tricksRegistry = TrickRegistry.initialize();
     const stateContent = readFileSync(flags['state-file'], 'utf-8');
-    const rootState = JSON.parse(stateContent);
+    const rootState = JSON.parse(stateContent.toString());
     const taskList: ListrTask[] = [];
 
     for (const trick of tricksRegistry.all()) {

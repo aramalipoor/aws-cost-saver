@@ -11,16 +11,22 @@ export class ShutdownEC2InstancesTrick
   implements TrickInterface<ShutdownEC2InstancesState> {
   private ec2Client: AWS.EC2;
 
+  static machineName = 'shutdown-ec2-instances';
+
   constructor() {
     this.ec2Client = new AWS.EC2();
   }
 
   getMachineName(): string {
-    return 'shutdown-ec2-instances';
+    return ShutdownEC2InstancesTrick.machineName;
   }
 
   getDisplayName(): string {
     return 'Shutdown EC2 Instances';
+  }
+
+  canBeConcurrent(): boolean {
+    return false;
   }
 
   async conserve(

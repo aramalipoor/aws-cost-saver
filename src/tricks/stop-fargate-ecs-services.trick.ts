@@ -13,6 +13,8 @@ export class StopFargateEcsServicesTrick
   implements TrickInterface<StopFargateEcsServicesState> {
   private ecsClient: AWS.ECS;
 
+  static machineName = 'stop-fargate-ecs-services';
+
   private aasClient: AWS.ApplicationAutoScaling;
 
   constructor() {
@@ -21,11 +23,15 @@ export class StopFargateEcsServicesTrick
   }
 
   getMachineName(): string {
-    return 'stop-fargate-ecs-services';
+    return StopFargateEcsServicesTrick.machineName;
   }
 
   getDisplayName(): string {
     return 'Stop Fargate ECS Services';
+  }
+
+  canBeConcurrent(): boolean {
+    return true;
   }
 
   async conserve(
@@ -120,6 +126,7 @@ export class StopFargateEcsServicesTrick
     if (dryRun) {
       task.skip('Skipped due to dry-run');
     } else if (serviceState.desired > 0) {
+      task.output = `Updating desired count to zero...`;
       await this.ecsClient
         .updateService({
           cluster: clusterState.arn,
@@ -127,7 +134,12 @@ export class StopFargateEcsServicesTrick
           desiredCount: 0,
         })
         .promise();
-      task.output = 'Set desired count to 0';
+      task.output = `Waiting for service to scale down to zero...`;
+      await this.ecsClient.waitFor('servicesStable', {
+        cluster: clusterState.arn,
+        services: [serviceState.arn],
+      });
+      task.output = 'Set desired count to zero';
     } else {
       task.skip(`Skipped, desired count is already zero`);
     }
@@ -177,6 +189,7 @@ export class StopFargateEcsServicesTrick
     if (dryRun) {
       task.skip(`Skipped due to dry-run`);
     } else if (serviceState.desired > 0) {
+      task.output = `Updating desired count to ${serviceState.desired}...`;
       await this.ecsClient
         .updateService({
           cluster: clusterState.arn,
@@ -184,6 +197,11 @@ export class StopFargateEcsServicesTrick
           desiredCount: serviceState.desired,
         })
         .promise();
+      task.output = `Waiting for service to reach ${serviceState.desired} desired tasks...`;
+      await this.ecsClient.waitFor('servicesStable', {
+        cluster: clusterState.arn,
+        services: [serviceState.arn],
+      });
       task.output = `Restored desired count to ${serviceState.desired}`;
     } else {
       task.skip(`Skipped, desired count was previously zero`);

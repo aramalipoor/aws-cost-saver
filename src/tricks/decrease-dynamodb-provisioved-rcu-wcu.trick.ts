@@ -11,16 +11,22 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   implements TrickInterface<DecreaseDynamoDBProvisionedRcuWcuState> {
   private ddbClient: AWS.DynamoDB;
 
+  static machineName = 'decrease-dynamodb-provisioned-rcu-wcu';
+
   constructor() {
     this.ddbClient = new AWS.DynamoDB();
   }
 
   getMachineName(): string {
-    return 'decrease-dynamodb-provisioned-rcu-wcu';
+    return DecreaseDynamoDBProvisionedRcuWcuTrick.machineName;
   }
 
   getDisplayName(): string {
     return 'Decrease DynamoDB Provisioned RCU and WCU';
+  }
+
+  canBeConcurrent(): boolean {
+    return true;
   }
 
   async conserve(

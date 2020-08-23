@@ -16,6 +16,7 @@ This utility is meant for **development** environments only where stopping and r
 # Usage
 ```sh-session
 $ npm install -g aws-cost-saver
+$ aws-cost-saver conserve --dry-run
 ```
 ## Commands
 Under the hood [aws-sdk](https://github.com/aws/aws-sdk-js) is used, therefore AWS Credentials are read in this order:
@@ -73,6 +74,15 @@ Stopping RDS databases will save underlying EC2 instance costs. This trick will 
 
 ### # decrease-dynamodb-provisioned-rcu-wcu
 Provisioned RCU and WCU on DynamoDB tables costs hourly. This trick will decrease them to minimum value (i.e. 1). Original values will be stored in state-file to be restored later.
+
+### # remove-nat-gateway
+NAT Gateways are charged hourly. This trick will remove NAT Gateways while you don't use your services, and creates them again on "restore" command.
+
+* Removing NAT Gateways stops instances access to internet.
+* This trick is currently _disabled by default_ because removing/recreating NAT gateway will change the ID therefore IaC such as terraform will be confused. Use `--use-trick` flag to explicitly enable it:
+```sh
+$ aws-cost-saver conserve --use-trick remove-nat-gateways
+```
 
 ### # TODO
 If you know any other tricks to save some money feel free to create a Pull Request or raise an issue.
