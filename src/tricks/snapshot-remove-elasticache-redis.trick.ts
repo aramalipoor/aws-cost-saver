@@ -197,7 +197,7 @@ export class SnapshotRemoveElasticacheRedisTrick
             NumNodeGroups:
               nodeGroups.length > 1 ? nodeGroups.length : undefined,
             MultiAZEnabled:
-              replicationGroup.MultiAZ &&
+              replicationGroup.MultiAZ !== undefined &&
               replicationGroup.MultiAZ === 'enabled',
             NodeGroupConfiguration:
               nodeGroups.length > 1 ? nodeGroups : undefined,
@@ -206,14 +206,16 @@ export class SnapshotRemoveElasticacheRedisTrick
                 ?.GlobalReplicationGroupId,
             KmsKeyId: replicationGroup.KmsKeyId,
             AutomaticFailoverEnabled:
-              replicationGroup.AutomaticFailover &&
+              replicationGroup.AutomaticFailover !== undefined &&
               ['enabled', 'enabling'].includes(
                 replicationGroup.AutomaticFailover,
               ),
             Port:
-              cacheClusters[0]?.CacheNodes[0]?.Endpoint?.Port ||
-              replicationGroup.NodeGroups[0]?.PrimaryEndpoint?.Port,
-            Tags: await this.getTags(cacheClusters[0]?.ARN),
+              (cacheClusters[0]?.CacheNodes &&
+                cacheClusters[0]?.CacheNodes[0]?.Endpoint?.Port) ||
+              (replicationGroup.NodeGroups &&
+                replicationGroup.NodeGroups[0]?.PrimaryEndpoint?.Port),
+            Tags: await this.getTags(cacheClusters[0]?.ARN || ''),
 
             // Cache Clusters Configs
             PreferredCacheClusterAZs:
@@ -224,35 +226,41 @@ export class SnapshotRemoveElasticacheRedisTrick
                       .map(c => c.PreferredAvailabilityZone || '')
                       .filter(az => az !== ''),
                   ),
-            SecurityGroupIds: _.uniq(
-              [].concat(
+            SecurityGroupIds: _.uniq<string>(
+              ([] as string[]).concat(
                 ...cacheClusters.map(c =>
-                  c.SecurityGroups?.map(s => s.SecurityGroupId),
+                  c.SecurityGroups
+                    ? c.SecurityGroups.map(s => s.SecurityGroupId || '')
+                    : [],
                 ),
               ),
-            ),
-            CacheSecurityGroupNames: _.uniq(
-              [].concat(
+            ).filter(sg => sg !== ''),
+            CacheSecurityGroupNames: _.uniq<string>(
+              ([] as string[]).concat(
                 ...cacheClusters.map(c =>
-                  c.CacheSecurityGroups?.map(s => s.CacheSecurityGroupName),
+                  c.CacheSecurityGroups
+                    ? c.CacheSecurityGroups.map(
+                        s => s.CacheSecurityGroupName || '',
+                      )
+                    : [],
                 ),
               ),
-            ),
+            ).filter(sg => sg !== ''),
 
             // Shared Cache Cluster Configs
-            AutoMinorVersionUpgrade: cacheClusters[0].AutoMinorVersionUpgrade,
-            CacheNodeType: cacheClusters[0].CacheNodeType,
-            SnapshotRetentionLimit: cacheClusters[0].SnapshotRetentionLimit,
-            Engine: cacheClusters[0].Engine,
-            EngineVersion: cacheClusters[0].EngineVersion,
+            AutoMinorVersionUpgrade: cacheClusters[0]?.AutoMinorVersionUpgrade,
+            CacheNodeType: cacheClusters[0]?.CacheNodeType,
+            SnapshotRetentionLimit: cacheClusters[0]?.SnapshotRetentionLimit,
+            Engine: cacheClusters[0]?.Engine,
+            EngineVersion: cacheClusters[0]?.EngineVersion,
             CacheParameterGroupName:
-              cacheClusters[0].CacheParameterGroup?.CacheParameterGroupName,
-            CacheSubnetGroupName: cacheClusters[0].CacheSubnetGroupName,
+              cacheClusters[0]?.CacheParameterGroup?.CacheParameterGroupName,
+            CacheSubnetGroupName: cacheClusters[0]?.CacheSubnetGroupName,
             NotificationTopicArn:
-              cacheClusters[0].NotificationConfiguration.TopicArn,
-            SnapshotWindow: cacheClusters[0].SnapshotWindow,
+              cacheClusters[0]?.NotificationConfiguration?.TopicArn,
+            SnapshotWindow: cacheClusters[0]?.SnapshotWindow,
             PreferredMaintenanceWindow:
-              cacheClusters[0].PreferredMaintenanceWindow,
+              cacheClusters[0]?.PreferredMaintenanceWindow,
           };
 
           return {
@@ -276,7 +284,7 @@ export class SnapshotRemoveElasticacheRedisTrick
         })
         .promise();
 
-      if (result.ReplicationGroups?.length > 0) {
+      if (result.ReplicationGroups && result.ReplicationGroups.length > 0) {
         return true;
       }
     } catch (error) {

@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import inquirer from 'inquirer';
+import AWS from 'aws-sdk';
 import Command, { flags } from '@oclif/command';
 import { writeFileSync, existsSync } from 'fs';
 import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
@@ -117,7 +118,7 @@ export default class Conserve extends Command {
 
     await this.validateStateFilePath(flags);
 
-    this.printBanner(awsConfig.region, awsConfig.credentials, flags);
+    this.printBanner(awsConfig, flags);
 
     const tricks = this.getEnabledTricks(flags);
     const taskList: ListrTask[] = [];
@@ -199,13 +200,13 @@ export default class Conserve extends Command {
       });
   }
 
-  private getEnabledTricks(flags): TrickInterface<any>[] {
+  private getEnabledTricks(flags: Record<string, any>): TrickInterface<any>[] {
     const tricksRegistry = TrickRegistry.initialize();
     const tricks = tricksRegistry.all();
 
     let enabledTricks: string[] = flags['no-default-tricks']
       ? []
-      : [].concat(...Conserve.tricksEnabledByDefault);
+      : ([] as string[]).concat(...Conserve.tricksEnabledByDefault);
 
     if (flags['use-trick'] && flags['use-trick'].length > 0) {
       enabledTricks.push(...flags['use-trick']);
@@ -234,8 +235,9 @@ export default class Conserve extends Command {
     });
   }
 
-  private printBanner(awsRegion, awsCredentials, flags) {
-    const awsProfile = (awsCredentials as any)?.profile || flags.profile;
+  private printBanner(awsConfig: AWS.Config, flags: Record<string, any>) {
+    const awsRegion = awsConfig.region || flags.region;
+    const awsProfile = (awsConfig.credentials as any).profile || flags.profile;
 
     this.log(`
 AWS Cost Saver
@@ -252,7 +254,7 @@ AWS Cost Saver
 `);
   }
 
-  private async validateStateFilePath(flags) {
+  private async validateStateFilePath(flags: Record<string, any>) {
     if (!flags['no-state-file'] && existsSync(flags['state-file'])) {
       this.log(
         chalk.yellow(

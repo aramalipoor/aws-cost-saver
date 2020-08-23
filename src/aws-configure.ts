@@ -1,6 +1,9 @@
 import AWS from 'aws-sdk';
 
-export const configureAWS = async (profile: string, region: string) => {
+export const configureAWS = async (
+  profile: string,
+  region: string,
+): Promise<AWS.Config> => {
   const credentials = await new AWS.CredentialProviderChain([
     () => new AWS.EnvironmentCredentials('AWS'),
     () =>
