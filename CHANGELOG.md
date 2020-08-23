@@ -1,4 +1,4 @@
-## [0.0.6](https://github.com/aramalipoor/aws-cost-saver) (XXXX-XX-XX)
+## [0.0.6](https://github.com/aramalipoor/aws-cost-saver) (2020-08-23)
 * Add snapshot-and-remove-elasti-cache-clusters trick ([#12](https://github.com/aramalipoor/aws-cost-saver/pull/12))
 * Allow enabling and disabling tricks using `--use-trick` and `--ignore-trick` ([#11](https://github.com/aramalipoor/aws-cost-saver/pull/11))
 * Allow concurrency for some tricks ([#11](https://github.com/aramalipoor/aws-cost-saver/pull/11))
