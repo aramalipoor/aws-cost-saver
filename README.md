@@ -10,6 +10,7 @@ A tiny CLI tool to help save costs in development environments when you're aslee
   * [stop-rds-database-instances](#-stop-rds-database-instances)
   * [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
   * [remove-nat-gateways](#-remove-nat-gateways)
+  * [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -86,6 +87,15 @@ NAT Gateways are charged hourly. This trick will remove NAT Gateways while you d
 * This trick is currently **disabled by default** because removing/recreating NAT gateway will change the ID therefore IaC such as terraform will be confused. Use `--use-trick` flag to explicitly enable it:
 ```sh
 $ aws-cost-saver conserve --use-trick remove-nat-gateways
+```
+
+### # snapshot-and-remove-elasticache-clusters
+ElastiCache clusters cost hourly but unfortunately it's not possible to stop them like an EC2 instance. To save costs this trick will take a snapshot of current cluster (preserving data, config and cluster ID) and delete it. To restore it'll create a new cluster based on snapshot taken. 
+
+* Due to limitation on AWS, backup and restore is supported only for clusters running on Redis.
+* This trick is currently _disabled by default_ to be tested by early users. Use `--use-trick` flag to explicitly enable it:
+```sh
+$ aws-cost-saver conserve --use-trick snapshot-remove-elasticache-redis
 ```
 
 ### # TODO

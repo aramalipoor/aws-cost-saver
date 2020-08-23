@@ -13,6 +13,7 @@ import { StopFargateEcsServicesTrick } from '../tricks/stop-fargate-ecs-services
 import { StopRdsDatabaseInstancesTrick } from '../tricks/stop-rds-database-instances.trick';
 import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../tricks/decrease-dynamodb-provisioved-rcu-wcu.trick';
 import { RemoveNatGatewaysTrick } from '../tricks/remove-nat-gateways.trick';
+import { SnapshotRemoveElasticacheRedisTrick } from '../tricks/snapshot-remove-elasticache-redis.trick';
 
 export default class Conserve extends Command {
   static tricksEnabledByDefault: readonly string[] = [
@@ -25,6 +26,8 @@ export default class Conserve extends Command {
   static tricksDisabledByDefault: readonly string[] = [
     // Removing NAT gateways can confuse IaC like terraform
     RemoveNatGatewaysTrick.machineName,
+    // This is an experimental trick, plus removing and recreating ElastiCache clusters takes a long time
+    SnapshotRemoveElasticacheRedisTrick.machineName,
   ];
 
   static description = [
@@ -43,7 +46,9 @@ export default class Conserve extends Command {
     `$ aws-cost-saver conserve ${chalk.yellow('--dry-run')}`,
     `$ aws-cost-saver conserve ${chalk.yellow('--no-state-file')}`,
     `$ aws-cost-saver conserve ${chalk.yellow(
-      `--use-trick ${chalk.bold(RemoveNatGatewaysTrick.machineName)}`,
+      `--use-trick ${chalk.bold(
+        SnapshotRemoveElasticacheRedisTrick.machineName,
+      )}`,
     )}`,
     `$ aws-cost-saver conserve ${chalk.yellow(
       `--ignore-trick ${chalk.bold(StopRdsDatabaseInstancesTrick.machineName)}`,
