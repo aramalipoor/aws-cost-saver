@@ -11,16 +11,22 @@ export class StopRdsDatabaseInstancesTrick
   implements TrickInterface<StopRdsDatabaseInstancesState> {
   private rdsClient: AWS.RDS;
 
+  static machineName = 'stop-rds-database-instances';
+
   constructor() {
     this.rdsClient = new AWS.RDS();
   }
 
   getMachineName(): string {
-    return 'stop-rds-database-instances';
+    return StopRdsDatabaseInstancesTrick.machineName;
   }
 
   getDisplayName(): string {
     return 'Stop RDS Database Instances';
+  }
+
+  canBeConcurrent(): boolean {
+    return true;
   }
 
   async conserve(
@@ -85,11 +91,16 @@ export class StopRdsDatabaseInstancesTrick
       task.skip('Skipped due to dry-run');
     } else if (databaseState.status === 'available') {
       try {
+        task.output = 'Starting RDS instance...';
         await this.rdsClient
           .startDBInstance({
             DBInstanceIdentifier: databaseState.identifier,
           })
           .promise();
+        task.output = 'Waiting for RDS instance to be available...';
+        await this.rdsClient.waitFor('dBInstanceAvailable', {
+          DBInstanceIdentifier: databaseState.identifier,
+        });
         task.output = 'Started successfully';
       } catch (error) {
         if (error.code === 'InvalidDBInstanceState') {

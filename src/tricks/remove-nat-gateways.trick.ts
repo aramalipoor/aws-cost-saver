@@ -11,16 +11,22 @@ export class RemoveNatGatewaysTrick
   implements TrickInterface<RemoveNatGatewaysState> {
   private ec2Client: AWS.EC2;
 
+  static machineName = 'remove-nat-gateways';
+
   constructor() {
     this.ec2Client = new AWS.EC2();
   }
 
   getMachineName(): string {
-    return 'remove-nat-gateways';
+    return RemoveNatGatewaysTrick.machineName;
   }
 
   getDisplayName(): string {
     return 'Remove NAT Gateways';
+  }
+
+  canBeConcurrent(): boolean {
+    return true;
   }
 
   async conserve(
@@ -63,12 +69,13 @@ export class RemoveNatGatewaysTrick
     if (dryRun) {
       task.skip(`Skipped due to dry-run`);
     } else {
+      task.output = 'Deleting NAT gateway...';
       await this.ec2Client
         .deleteNatGateway({
           NatGatewayId: natGateway.id,
         })
         .promise();
-      task.output = 'Deleted';
+      task.output = 'NAT Gateway Deleted';
     }
   }
 
@@ -80,7 +87,8 @@ export class RemoveNatGatewaysTrick
     if (dryRun) {
       task.skip(`Skipped due to dry-run`);
     } else {
-      await this.ec2Client
+      task.output = 'Creating NAT gateway...';
+      const result = await this.ec2Client
         .createNatGateway({
           AllocationId: natGateway.allocationIds && natGateway.allocationIds[0],
           SubnetId: natGateway.subnetId,
@@ -92,7 +100,11 @@ export class RemoveNatGatewaysTrick
           ],
         })
         .promise();
-      task.output = 'Created';
+      task.output = 'Waiting for NAT Gateway to be available...';
+      await this.ec2Client.waitFor('natGatewayAvailable', {
+        NatGatewayIds: [result.NatGateway?.NatGatewayId || ''],
+      });
+      task.output = 'NAT Gateway Created';
     }
   }
 
