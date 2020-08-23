@@ -5,12 +5,13 @@ A tiny CLI tool to help save costs in development environments when you're aslee
 
 * [Usage](#usage)
 * [Tricks](#tricks)
-  * [shutdown-ec2-instances](#-shutdown-ec2-instances)
-  * [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
-  * [stop-rds-database-instances](#-stop-rds-database-instances)
-  * [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
-  * [remove-nat-gateways](#-remove-nat-gateways)
-  * [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
+  1. [shutdown-ec2-instances](#-shutdown-ec2-instances)
+  2. [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
+  3. [stop-rds-database-instances](#-stop-rds-database-instances)
+  4. [decrease-dynamodb-provisioned-rcu-wcu](#-decrease-dynamodb-provisioned-rcu-wcu)
+  5. [remove-nat-gateways](#-remove-nat-gateways)
+  6. [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
+  7. [decrease-kinesis-streams-shards](#-decrease-kinesis-streams-shards)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -18,6 +19,8 @@ This utility is meant for **development** environments only where stopping and r
 # Usage
 ```sh-session
 $ npm install -g aws-cost-saver
+
+$ aws-cost-saver conserve --help
 $ aws-cost-saver conserve --dry-run
 ```
 ## Commands
@@ -97,6 +100,9 @@ ElastiCache clusters cost hourly but unfortunately it's not possible to stop the
 ```sh
 $ aws-cost-saver conserve --use-trick snapshot-remove-elasticache-redis
 ```
+
+### # decrease-kinesis-streams-shards
+Kinesis Stream Shards cost hourly. This trick will decrease open shards to the minimum of 1, in multiple steps by [halving number of shards](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_UpdateShardCount.html#Streams-UpdateShardCount-request-TargetShardCount) in each step. Currently this trick is useful when you're doing `UNIFORM_SCALING`, i.e. default config of Kinesis Stream. 
 
 ### # TODO
 If you know any other tricks to save some money feel free to create a Pull Request or raise an issue.
