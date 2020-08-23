@@ -30,15 +30,18 @@ This command uses [various tricks](#tricks) to conserve as much money as possibl
 
 ```
 USAGE
-  $ aws-cost-saver conserve [-d|--dry-run] [-s|--state-file aws-cost-saver.json] [-n|--no-state-file] [-r|--region eu-central-1] [-p|--profile default]
+  $ aws-cost-saver conserve [-d|--dry-run] [-s|--state-file aws-cost-saver.json] ...
 
 OPTIONS
-  -h, --help            Show CLI help.
-  -d, --dry-run         Only list actions and do not actually execute them.
-  -s, --state-file      (default: aws-cost-saver.json) Path to save current state of your AWS resources.
-  -n, --no-state-file   (default: false) Do not keep original state, just conserve as much money as possible.
-  -r, --region          (default: eu-central-1) AWS region to look up and save resoruces.
-  -p, --profile         (default: default) AWS profile to lookup from ~/.aws/config
+  -d, --dry-run                          Only print actions and write state-file of current resources.
+  -n, --no-state-file                    Ignore saving current state, useful when want to only conserve as much money as possible.
+  -s, --state-file state-file.json       [default: aws-cost-saver.json] Where to keep original state of stopped/decreased resources to restore later.
+  -u, --use-trick trick-machine-name     Enables an individual trick. Useful for tricks that are disabled by default.
+  -i, --ignore-trick trick-machine-name  Disables an individual trick. Useful when you do not like to use a specific trick.
+  --no-default-tricks                    Disables all default tricks. Useful alongside --use-trick when you only want a set of specific tricks to execute.
+  -r, --region eu-central-1              [default: eu-central-1] AWS Region to converse resources in
+  -p, --profile my-aws-profile           [default: default] AWS Profile to use from ~/.aws/config
+  -h, --help                             Show CLI help
 ```
 
 <p align="center">
@@ -54,15 +57,11 @@ USAGE
   $ aws-cost-saver restore [-d|--dry-run] [-s|--state-file aws-cost-saver.json] ...
 
 OPTIONS
-  -d, --dry-run                    Only print actions and write state-file of current resources.
-  -h, --help                       show CLI help
-  -i, --ignore-trick=ignore-trick  Disables an individual trick. Useful when you do not like to use a specific trick.
-  -n, --no-state-file              Ignore saving current state, useful when want to only conserve as much money as possible.
-  -p, --profile=profile            [default: default]
-  -r, --region=region              [default: eu-central-1]
-  -s, --state-file=state-file      [default: aws-cost-saver.json] Where to keep original state of stopped/decreased resources to restore later.
-  -u, --use-trick=use-trick        Enables an individual trick. Useful for tricks that are disabled by default.
-  --no-default-tricks              Disables all default tricks. Useful alongside --use-trick when you only want a set of specific tricks to execute.
+  -d, --dry-run          Only list actions and do not actually execute them.
+  -s, --state-file       [default: aws-cost-saver.json] Path to load previous state of your AWS resources from.
+  -r, --region           [default: eu-central-1] AWS region to restore resoruces in.
+  -p, --profile          [default: default] AWS profile to lookup from ~/.aws/config
+  -h, --help             Show CLI help.
 ```
 
 # Tricks
