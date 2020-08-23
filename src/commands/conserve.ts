@@ -15,6 +15,7 @@ import { StopRdsDatabaseInstancesTrick } from '../tricks/stop-rds-database-insta
 import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../tricks/decrease-dynamodb-provisioved-rcu-wcu.trick';
 import { RemoveNatGatewaysTrick } from '../tricks/remove-nat-gateways.trick';
 import { SnapshotRemoveElasticacheRedisTrick } from '../tricks/snapshot-remove-elasticache-redis.trick';
+import { DecreaseKinesisStreamsShardsTrick } from '../tricks/decrease-kinesis-streams-shards.trick';
 
 export default class Conserve extends Command {
   static tricksEnabledByDefault: readonly string[] = [
@@ -22,6 +23,7 @@ export default class Conserve extends Command {
     StopFargateEcsServicesTrick.machineName,
     StopRdsDatabaseInstancesTrick.machineName,
     DecreaseDynamoDBProvisionedRcuWcuTrick.machineName,
+    DecreaseKinesisStreamsShardsTrick.machineName,
   ];
 
   static tricksDisabledByDefault: readonly string[] = [
