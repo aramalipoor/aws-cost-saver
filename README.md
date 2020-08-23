@@ -38,7 +38,7 @@ OPTIONS
   -s, --state-file state-file.json       [default: aws-cost-saver.json] Where to keep original state of stopped/decreased resources to restore later.
   -u, --use-trick trick-machine-name     Enables an individual trick. Useful for tricks that are disabled by default.
   -i, --ignore-trick trick-machine-name  Disables an individual trick. Useful when you do not like to use a specific trick.
-  --no-default-tricks                    Disables all default tricks. Useful alongside --use-trick when you only want a set of specific tricks to execute.
+  --no-default-tricks                    Disables all default tricks. Useful alongside --use-trick to enable only specific set of tricks.
   -r, --region eu-central-1              [default: eu-central-1] AWS Region to converse resources in
   -p, --profile my-aws-profile           [default: default] AWS Profile to use from ~/.aws/config
   -h, --help                             Show CLI help
