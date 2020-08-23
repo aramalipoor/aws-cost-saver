@@ -48,7 +48,7 @@ jobs:
 
 workflows:
   version: 2
-  "@oclif/example-multi-ts":
+  "aws-cost-saver":
     jobs:
       - node-latest
       - node-12

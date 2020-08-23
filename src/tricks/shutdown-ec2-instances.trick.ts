@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import AWS from 'aws-sdk';
 import Listr, { ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
