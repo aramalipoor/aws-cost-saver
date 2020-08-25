@@ -12,7 +12,7 @@ import { TrickInterface } from '../interfaces/trick.interface';
 import { ShutdownEC2InstancesTrick } from '../tricks/shutdown-ec2-instances.trick';
 import { StopFargateEcsServicesTrick } from '../tricks/stop-fargate-ecs-services.trick';
 import { StopRdsDatabaseInstancesTrick } from '../tricks/stop-rds-database-instances.trick';
-import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../tricks/decrease-dynamodb-provisioved-rcu-wcu.trick';
+import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../tricks/decrease-dynamodb-provisioned-rcu-wcu.trick';
 import { RemoveNatGatewaysTrick } from '../tricks/remove-nat-gateways.trick';
 import { SnapshotRemoveElasticacheRedisTrick } from '../tricks/snapshot-remove-elasticache-redis.trick';
 import { DecreaseKinesisStreamsShardsTrick } from '../tricks/decrease-kinesis-streams-shards.trick';
