@@ -1,10 +1,12 @@
-import { Command, flags } from '@oclif/command';
+import AWS from 'aws-sdk';
+import chalk from 'chalk';
 import { readFileSync } from 'fs';
+import { Command, flags } from '@oclif/command';
+import Listr, { ListrTask } from 'listr';
 
 import { TrickRegistry } from '../tricks/trick-registry';
-import { configureAWS } from '../aws-configure';
-import chalk from 'chalk';
-import Listr, { ListrTask } from 'listr';
+import { configureAWS } from '../configure-aws';
+import { RootState } from '../interfaces/root-state';
 
 export default class Restore extends Command {
   static description =
@@ -44,47 +46,24 @@ export default class Restore extends Command {
 
     const awsConfig = await configureAWS(flags.profile, flags.region);
 
-    const awsRegion = awsConfig.region;
-    const awsProfile = (awsConfig.credentials as any)?.profile || flags.profile;
-
-    this.log(`
-AWS Cost Saver
---------------
-  Action: ${chalk.green('restore')}
-  AWS region: ${chalk.green(awsRegion)}
-  AWS profile: ${chalk.green(awsProfile)}
-  State file: ${chalk.green(flags['state-file'])}
-`);
+    this.printBanner(awsConfig, flags);
 
     const tricksRegistry = TrickRegistry.initialize();
     const stateContent = readFileSync(flags['state-file'], 'utf-8');
-    const rootState = JSON.parse(stateContent.toString());
+    const rootState: RootState = JSON.parse(stateContent.toString());
     const taskList: ListrTask[] = [];
 
     for (const trick of tricksRegistry.all()) {
       taskList.push({
-        title: `${trick.getDisplayName()}`,
+        title: `${trick.getRestoreTitle()}`,
         task: async (ctx, task) => {
-          const subListr = new Listr([], {
-            concurrent: false,
-            exitOnError: false,
-            // @ts-ignore
-            collapse: false,
-          });
-
-          if (rootState[trick.getMachineName()]) {
-            await trick
-              .restore(
-                subListr,
-                flags['dry-run'],
-                rootState[trick.getMachineName()],
-              )
-              .catch(task.report);
-          } else {
-            task.skip('Nothing was conserved previously.');
+          if (!rootState[trick.getMachineName()]) {
+            return task.skip('Nothing was conserved previously.');
           }
 
-          return subListr;
+          return trick
+            .restore(task, rootState[trick.getMachineName()], flags['dry-run'])
+            .catch(task.report);
         },
         exitOnError: false,
         // @ts-ignore
@@ -92,9 +71,8 @@ AWS Cost Saver
       } as ListrTask);
     }
 
-    await new Listr(taskList, {
+    await new Listr<RootState>(taskList, {
       concurrent: true,
-      renderer: 'default',
       exitOnError: false,
       // @ts-ignore
       collapse: false,
@@ -120,5 +98,24 @@ AWS Cost Saver
           )}.`,
         );
       });
+  }
+
+  private printBanner(awsConfig: AWS.Config, flags: Record<string, any>) {
+    const awsRegion = awsConfig.region || flags.region;
+    const awsProfile = (awsConfig.credentials as any).profile || flags.profile;
+
+    this.log(`
+AWS Cost Saver
+--------------
+  Action: ${chalk.green('restore')}
+  AWS region: ${chalk.green(awsRegion)}
+  AWS profile: ${chalk.green(awsProfile)}
+  State file: ${
+    flags['no-state-file']
+      ? chalk.yellow('none')
+      : chalk.green(flags['state-file'])
+  }
+  Dry run: ${flags['dry-run'] ? chalk.green('yes') : chalk.yellow('no')}
+`);
   }
 }

@@ -17,11 +17,17 @@ A tiny CLI tool to help save costs in development environments when you're aslee
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
 
 # Usage
-```sh-session
+```bash
+# Install
 $ npm install -g aws-cost-saver
 
+# Try
 $ aws-cost-saver conserve --help
-$ aws-cost-saver conserve --dry-run
+$ aws-cost-saver conserve --dry-run --no-state-file
+
+# Use
+$ aws-cost-saver conserve
+$ aws-cost-saver restore
 ```
 ## Commands
 Under the hood [aws-sdk](https://github.com/aws/aws-sdk-js) is used, therefore AWS Credentials are read in this order:

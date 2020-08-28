@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
-import Listr, { ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
+import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { DynamoDBTableState } from '../states/dynamodb-table.state';
@@ -21,125 +21,209 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     return DecreaseDynamoDBProvisionedRcuWcuTrick.machineName;
   }
 
-  getDisplayName(): string {
+  getConserveTitle(): string {
     return 'Decrease DynamoDB Provisioned RCU and WCU';
   }
 
-  canBeConcurrent(): boolean {
-    return true;
+  getRestoreTitle(): string {
+    return 'Restore DynamoDB Provisioned RCU and WCU';
   }
 
-  async conserve(
-    subListr: Listr,
-    dryRun: boolean,
-  ): Promise<DecreaseDynamoDBProvisionedRcuWcuState> {
-    const tables = await this.listTables();
-    const currentState = await this.getCurrentState(tables);
-
-    for (const table of currentState) {
-      subListr.add({
-        title: chalk.blueBright(`${table.name}`),
-        task: (ctx, task) => this.conserveTable(task, dryRun, table),
-      });
-    }
-
-    return currentState;
-  }
-
-  async restore(
-    subListr: Listr,
-    dryRun: boolean,
-    originalState: DecreaseDynamoDBProvisionedRcuWcuState,
-  ): Promise<void> {
-    for (const table of originalState) {
-      subListr.add({
-        title: chalk.blueBright(table.name),
-        task: (ctx, task) => this.restoreTable(task, dryRun, table),
-      });
-    }
-  }
-
-  private async conserveTable(
+  async getCurrentState(
     task: ListrTaskWrapper,
-    dryRun: boolean,
-    tableState: DynamoDBTableState,
-  ): Promise<void> {
-    if (dryRun) {
-      task.skip('Skipped due to dry-run');
-    } else if (tableState.provisionedThroughput) {
-      if (tableState.wcu > 1 && tableState.rcu > 1) {
-        await this.ddbClient
-          .updateTable({
-            TableName: tableState.name,
-            ProvisionedThroughput: {
-              ReadCapacityUnits: 1,
-              WriteCapacityUnits: 1,
-            },
-          })
-          .promise();
-        task.output = `Configured RCU = 1 WCU = 1`;
-      } else {
-        task.skip(`Provisioned RCU/WCU is already at minimum of 1`);
-      }
-    } else {
-      task.skip(`Provisioned throughput is not configured`);
+    currentState: DecreaseDynamoDBProvisionedRcuWcuState,
+  ): Promise<Listr> {
+    const tableNames = await this.listTableNames(task);
+
+    if (!tableNames || tableNames.length === 0) {
+      task.skip('No DynamoDB tables found');
+      return;
     }
-  }
 
-  private async restoreTable(
-    task: ListrTaskWrapper,
-    dryRun: boolean,
-    tableState: DynamoDBTableState,
-  ): Promise<void> {
-    if (dryRun) {
-      task.skip(`Skipped due to dry-run`);
-    } else if (tableState.provisionedThroughput) {
-      await this.ddbClient
-        .updateTable({
-          TableName: tableState.name,
-          ProvisionedThroughput: {
-            ReadCapacityUnits: tableState.rcu,
-            WriteCapacityUnits: tableState.wcu,
-          },
-        })
-        .promise();
-      task.output = `Configured RCU = ${tableState.rcu} WCU = ${tableState.wcu}`;
-    } else {
-      task.skip(`Provisioned throughput was not configured`);
-    }
-  }
+    const subListr = new Listr({
+      concurrent: 10,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
 
-  private async getCurrentState(
-    tables: AWS.DynamoDB.TableNameList,
-  ): Promise<DynamoDBTableState[]> {
-    return Promise.all(
-      tables.map(
-        async (table): Promise<DynamoDBTableState> => {
-          const provisionedThroughput = (
-            await this.ddbClient.describeTable({ TableName: table }).promise()
-          ).Table?.ProvisionedThroughput;
-
-          if (!provisionedThroughput) {
-            return {
-              name: table,
-              provisionedThroughput: false,
-              rcu: 0,
-              wcu: 0,
-            };
-          }
-
+    subListr.add(
+      tableNames.map(
+        (tableName): ListrTask => {
+          const tableState: DynamoDBTableState = {
+            name: tableName,
+          };
+          currentState.push(tableState);
           return {
-            name: table,
-            provisionedThroughput: true,
-            rcu: provisionedThroughput.ReadCapacityUnits || 0,
-            wcu: provisionedThroughput.ReadCapacityUnits || 0,
+            title: tableName,
+            task: async (ctx, task) => this.getTableState(task, tableState),
           };
         },
       ),
     );
+
+    return subListr;
   }
 
-  private async listTables(): Promise<AWS.DynamoDB.TableNameList> {
-    return (await this.ddbClient.listTables().promise()).TableNames || [];
+  async conserve(
+    task: ListrTaskWrapper,
+    currentState: DecreaseDynamoDBProvisionedRcuWcuState,
+    dryRun: boolean,
+  ): Promise<Listr> {
+    const subListr = new Listr({
+      concurrent: 10,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
+
+    if (currentState && currentState.length > 0) {
+      for (const table of currentState) {
+        subListr.add({
+          title: `${chalk.blueBright(table.name)}`,
+          task: (ctx, task) =>
+            this.conserveTableProvisionedRcuWcu(task, table, dryRun),
+        });
+      }
+    } else {
+      task.skip(`No DynamoDB tables found`);
+    }
+
+    return subListr;
+  }
+
+  async restore(
+    task: ListrTaskWrapper,
+    currentState: DecreaseDynamoDBProvisionedRcuWcuState,
+    dryRun: boolean,
+  ): Promise<Listr> {
+    const subListr = new Listr({
+      concurrent: 10,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
+
+    if (currentState && currentState.length > 0) {
+      for (const table of currentState) {
+        subListr.add({
+          title: `${chalk.blueBright(table.name)}`,
+          task: (ctx, task) =>
+            this.restoreTableProvisionedRcuWcu(task, table, dryRun),
+        });
+      }
+    } else {
+      task.skip(`No DynamoDB tables was conserved`);
+    }
+
+    return subListr;
+  }
+
+  private async listTableNames(
+    task: ListrTaskWrapper,
+  ): Promise<AWS.DynamoDB.TableNameList> {
+    const tableNames: string[] = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'Fetching page 1...';
+    tableNames.push(
+      ...((await this.ddbClient.listTables({ Limit: 100 }).promise())
+        .TableNames || []),
+    );
+
+    return tableNames;
+  }
+
+  private async getTableState(
+    task: ListrTaskWrapper,
+    tableState: DynamoDBTableState,
+  ): Promise<void> {
+    task.output = 'Fetching table information...';
+    const provisionedThroughput = (
+      await this.ddbClient
+        .describeTable({ TableName: tableState.name })
+        .promise()
+    ).Table?.ProvisionedThroughput;
+
+    if (!provisionedThroughput) {
+      tableState.provisionedThroughput = false;
+      return;
+    }
+
+    tableState.provisionedThroughput = true;
+    tableState.rcu = provisionedThroughput.ReadCapacityUnits;
+    tableState.wcu = provisionedThroughput.WriteCapacityUnits;
+  }
+
+  private async conserveTableProvisionedRcuWcu(
+    task: ListrTaskWrapper,
+    tableState: DynamoDBTableState,
+    dryRun: boolean,
+  ): Promise<void> {
+    if (!tableState.provisionedThroughput) {
+      task.skip(`Provisioned throughput is not configured`);
+      return;
+    }
+
+    if (tableState.wcu < 2 && tableState.rcu < 2) {
+      task.skip(`Provisioned RCU/WCU is already at minimum of 1`);
+      return;
+    }
+
+    if (dryRun) {
+      task.skip('Skipped, would configure RCU = 1 WCU = 1');
+      return;
+    }
+
+    task.output = `Configuring RCU = 1 WCU = 1 ...`;
+    await this.ddbClient
+      .updateTable({
+        TableName: tableState.name,
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 1,
+          WriteCapacityUnits: 1,
+        },
+      })
+      .promise();
+
+    task.output = `Configured RCU = 1 WCU = 1`;
+  }
+
+  private async restoreTableProvisionedRcuWcu(
+    task: ListrTaskWrapper,
+    tableState: DynamoDBTableState,
+    dryRun: boolean,
+  ): Promise<void> {
+    if (!tableState.provisionedThroughput) {
+      task.skip(`Provisioned throughput was not configured`);
+      return;
+    }
+
+    if (dryRun) {
+      task.skip(
+        `Skipped, would configure RCU = ${tableState.rcu} WCU = ${tableState.wcu}`,
+      );
+      return;
+    }
+
+    if (!tableState.rcu || !tableState.wcu) {
+      task.skip(
+        `Skipped, RCU = ${tableState.rcu} WCU = ${tableState.wcu} are not configured correctly`,
+      );
+      return;
+    }
+
+    task.output = `Configuring ${tableState.rcu} WCU = ${tableState.wcu} ...`;
+    await this.ddbClient
+      .updateTable({
+        TableName: tableState.name,
+        ProvisionedThroughput: {
+          ReadCapacityUnits: tableState.rcu,
+          WriteCapacityUnits: tableState.wcu,
+        },
+      })
+      .promise();
+
+    task.output = `Configured RCU = ${tableState.rcu} WCU = ${tableState.wcu}`;
   }
 }

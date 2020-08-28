@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import AWS from 'aws-sdk';
-import Listr, { ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
+import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { EcsClusterState } from '../states/ecs-cluster.state';
@@ -26,26 +26,71 @@ export class StopFargateEcsServicesTrick
     return StopFargateEcsServicesTrick.machineName;
   }
 
-  getDisplayName(): string {
+  getConserveTitle(): string {
     return 'Stop Fargate ECS Services';
   }
 
-  canBeConcurrent(): boolean {
-    return true;
+  getRestoreTitle(): string {
+    return 'Restore Fargate ECS Services';
+  }
+
+  async getCurrentState(
+    task: ListrTaskWrapper,
+    currentState: StopFargateEcsServicesState,
+  ): Promise<Listr> {
+    const clustersArn = await this.listClusters(task);
+
+    if (!clustersArn || clustersArn.length === 0) {
+      task.skip('No clusters found');
+      return;
+    }
+
+    const subListr = new Listr({
+      concurrent: 3,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
+
+    subListr.add(
+      clustersArn.map(
+        (clusterArn): ListrTask => {
+          const clusterState: EcsClusterState = {
+            arn: clusterArn,
+            services: [],
+          };
+          currentState.push(clusterState);
+          return {
+            title: clusterArn,
+            task: async (ctx, task) => this.getClusterState(task, clusterState),
+          };
+        },
+      ),
+    );
+
+    return subListr;
   }
 
   async conserve(
-    subListr: Listr,
+    task: ListrTaskWrapper,
+    currentState: StopFargateEcsServicesState,
     dryRun: boolean,
-  ): Promise<StopFargateEcsServicesState> {
-    const clustersArn = await this.listClusters();
-    const currentState = await this.getCurrentState(clustersArn);
+  ): Promise<Listr> {
+    const subListr = new Listr({
+      concurrent: 3,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
 
     for (const cluster of currentState) {
       for (const service of cluster.services) {
         subListr.add({
           title: `${chalk.blueBright(
-            this.getEcsServiceResourceId(cluster.arn, service.arn),
+            StopFargateEcsServicesTrick.getEcsServiceResourceId(
+              cluster.arn,
+              service.arn,
+            ),
           )}`,
           task: () =>
             new Listr(
@@ -53,16 +98,16 @@ export class StopFargateEcsServicesTrick
                 {
                   title: 'Desired count',
                   task: (ctx, task) =>
-                    this.conserveService(task, dryRun, cluster, service),
+                    this.conserveDesiredCount(task, cluster, service, dryRun),
                 },
                 {
                   title: 'Auto scaling',
                   task: (ctx, task) =>
                     this.conserveScalableTargets(
                       task,
-                      dryRun,
                       cluster,
                       service,
+                      dryRun,
                     ),
                 },
               ],
@@ -77,19 +122,29 @@ export class StopFargateEcsServicesTrick
       }
     }
 
-    return currentState;
+    return subListr;
   }
 
   async restore(
-    subListr: Listr,
-    dryRun: boolean,
+    task: ListrTaskWrapper,
     originalState: StopFargateEcsServicesState,
-  ): Promise<void> {
+    dryRun: boolean,
+  ): Promise<Listr> {
+    const subListr = new Listr({
+      concurrent: 3,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
+
     for (const cluster of originalState) {
       for (const service of cluster.services) {
         subListr.add({
           title: `${chalk.blueBright(
-            this.getEcsServiceResourceId(cluster.arn, service.arn),
+            StopFargateEcsServicesTrick.getEcsServiceResourceId(
+              cluster.arn,
+              service.arn,
+            ),
           )}`,
           task: () =>
             new Listr(
@@ -97,59 +152,212 @@ export class StopFargateEcsServicesTrick
                 {
                   title: 'Desired count',
                   task: (ctx, task) =>
-                    this.restoreService(task, dryRun, cluster, service),
+                    this.restoreDesiredCount(task, cluster, service, dryRun),
                 },
                 {
                   title: 'Auto scaling',
                   task: (ctx, task) =>
-                    this.restoreScalableTargets(task, dryRun, cluster, service),
+                    this.restoreScalableTargets(task, cluster, service, dryRun),
                 },
               ],
               {
                 exitOnError: false,
                 concurrent: true,
                 // @ts-ignore
-                collapse: true,
+                collapse: false,
               },
             ),
         });
       }
     }
+
+    return subListr;
   }
 
-  private async conserveService(
+  private async getClusterState(
     task: ListrTaskWrapper,
-    dryRun: boolean,
+    clusterState: EcsClusterState,
+  ) {
+    const services = await this.describeAllServices(task, clusterState.arn);
+
+    if (!services || services.length === 0) {
+      task.skip('No services found');
+      return;
+    }
+
+    const subListr = new Listr({
+      concurrent: 10,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
+
+    subListr.add(
+      services.map(
+        (service): ListrTask => {
+          if (!service.serviceArn) {
+            throw new Error(
+              `Unexpected error: Fargate ECS Service does not have ARN`,
+            );
+          }
+
+          const serviceState: EcsServiceState = {
+            arn: service.serviceArn,
+            desired: service.desiredCount || 0,
+            scalableTargets: [],
+          };
+
+          clusterState.services.push(serviceState);
+
+          return {
+            title: service.serviceArn,
+            task: async (ctx, task) =>
+              this.getServiceState(task, serviceState, clusterState),
+          };
+        },
+      ),
+    );
+
+    return subListr;
+  }
+
+  private async getServiceState(
+    task: ListrTaskWrapper,
+    serviceState: EcsServiceState,
+    clusterState: EcsClusterState,
+  ): Promise<void> {
+    task.output = 'Fetching scalable targets...';
+    const scalableTargets = await this.describeAllScalableTargets(
+      clusterState.arn,
+      serviceState.arn,
+    );
+
+    serviceState.scalableTargets.push(
+      ...scalableTargets.map(st => ({
+        namespace: 'ecs',
+        resourceId: st.ResourceId,
+        scalableDimension: st.ScalableDimension,
+        min: st.MinCapacity,
+        max: st.MaxCapacity,
+      })),
+    );
+  }
+
+  private async listClusters(task: ListrTaskWrapper): Promise<string[]> {
+    const clustersArn: string[] = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'Fetching page 1...';
+    clustersArn.push(
+      ...((await this.ecsClient.listClusters({ maxResults: 100 }).promise())
+        .clusterArns || []),
+    );
+
+    return clustersArn;
+  }
+
+  private async listServices(task: ListrTaskWrapper, clusterArn: string) {
+    const servicesArn: string[] = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'Fetching page 1...';
+    servicesArn.push(
+      ...((
+        await this.ecsClient
+          .listServices({
+            cluster: clusterArn,
+            launchType: 'FARGATE',
+            maxResults: 100,
+          })
+          .promise()
+      ).serviceArns || []),
+    );
+
+    return servicesArn;
+  }
+
+  private async describeAllServices(
+    task: ListrTaskWrapper,
+    clusterArn: string,
+  ): Promise<AWS.ECS.Service[]> {
+    task.output = `Fetching all services ARNs...`;
+    const servicesArn = await this.listServices(task, clusterArn);
+    const chunks = _.chunk<string>(servicesArn, 10);
+    const result: AWS.ECS.Service[] = [];
+
+    for (let i = 0, c = chunks.length; i < c; i++) {
+      task.output = `Describing services, page ${i + 1} of ${c}...`;
+      const response = await this.ecsClient
+        .describeServices({ services: chunks[i], cluster: clusterArn })
+        .promise();
+
+      result.push(...(response.services || []));
+    }
+
+    return result;
+  }
+
+  private async describeAllScalableTargets(
+    clusterArn: string,
+    serviceArn: string,
+  ): Promise<AWS.ApplicationAutoScaling.ScalableTarget[]> {
+    const result = await this.aasClient
+      .describeScalableTargets({
+        ServiceNamespace: 'ecs',
+        ResourceIds: [
+          StopFargateEcsServicesTrick.getEcsServiceResourceId(
+            clusterArn,
+            serviceArn,
+          ),
+        ],
+        ScalableDimension: 'ecs:service:DesiredCount',
+      })
+      .promise();
+
+    return result.ScalableTargets || [];
+  }
+
+  private async conserveDesiredCount(
+    task: ListrTaskWrapper,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
+    dryRun: boolean,
   ): Promise<void> {
+    if (serviceState.desired < 1) {
+      task.skip(`Skipped, desired count is already zero`);
+      return;
+    }
+
     if (dryRun) {
-      task.skip('Skipped due to dry-run');
-    } else if (serviceState.desired > 0) {
-      task.output = `Updating desired count to zero...`;
-      await this.ecsClient
-        .updateService({
-          cluster: clusterState.arn,
-          service: serviceState.arn,
-          desiredCount: 0,
-        })
-        .promise();
-      task.output = `Waiting for service to scale down to zero...`;
-      await this.ecsClient.waitFor('servicesStable', {
+      task.skip('Skipped, would set tasks desired count to 0');
+      return;
+    }
+
+    task.output = `Updating desired count to zero...`;
+    await this.ecsClient
+      .updateService({
+        cluster: clusterState.arn,
+        service: serviceState.arn,
+        desiredCount: 0,
+      })
+      .promise();
+
+    task.output = `Waiting for service to scale down to zero...`;
+    await this.ecsClient
+      .waitFor('servicesStable', {
         cluster: clusterState.arn,
         services: [serviceState.arn],
-      });
-      task.output = 'Set desired count to zero';
-    } else {
-      task.skip(`Skipped, desired count is already zero`);
-    }
+      })
+      .promise();
+
+    task.output = 'Set desired count to zero';
   }
 
   private async conserveScalableTargets(
     task: ListrTaskWrapper,
-    dryRun: boolean,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
+    dryRun: boolean,
   ): Promise<void> {
     if (
       !serviceState.scalableTargets ||
@@ -159,14 +367,15 @@ export class StopFargateEcsServicesTrick
       return;
     }
 
-    if (dryRun) {
-      task.skip('Skipped due to dry-run');
-    } else {
-      for (const scalableTarget of serviceState.scalableTargets) {
-        const resourceId = this.getEcsServiceResourceId(
-          clusterState.arn,
-          serviceState.arn,
-        );
+    for (const scalableTarget of serviceState.scalableTargets) {
+      const resourceId = StopFargateEcsServicesTrick.getEcsServiceResourceId(
+        clusterState.arn,
+        serviceState.arn,
+      );
+
+      if (dryRun) {
+        task.skip('Skipped, would set scalable target min = 0 and max = 0');
+      } else {
         await this.aasClient
           .registerScalableTarget({
             ServiceNamespace: scalableTarget.namespace,
@@ -180,39 +389,49 @@ export class StopFargateEcsServicesTrick
     }
   }
 
-  private async restoreService(
+  private async restoreDesiredCount(
     task: ListrTaskWrapper,
-    dryRun: boolean,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
+    dryRun: boolean,
   ): Promise<void> {
+    if (serviceState.desired < 1) {
+      task.skip(`Skipped, desired count was previously zero`);
+      return;
+    }
+
     if (dryRun) {
-      task.skip(`Skipped due to dry-run`);
-    } else if (serviceState.desired > 0) {
-      task.output = `Updating desired count to ${serviceState.desired}...`;
-      await this.ecsClient
-        .updateService({
-          cluster: clusterState.arn,
-          service: serviceState.arn,
-          desiredCount: serviceState.desired,
-        })
-        .promise();
-      task.output = `Waiting for service to reach ${serviceState.desired} desired tasks...`;
-      await this.ecsClient.waitFor('servicesStable', {
+      task.skip(
+        `Skipped, would update desired count to ${serviceState.desired}`,
+      );
+      return;
+    }
+
+    task.output = `Updating desired count to ${serviceState.desired}...`;
+    await this.ecsClient
+      .updateService({
+        cluster: clusterState.arn,
+        service: serviceState.arn,
+        desiredCount: serviceState.desired,
+      })
+      .promise();
+
+    task.output = `Waiting for service to reach ${serviceState.desired} desired tasks...`;
+    await this.ecsClient
+      .waitFor('servicesStable', {
         cluster: clusterState.arn,
         services: [serviceState.arn],
-      });
-      task.output = `Restored desired count to ${serviceState.desired}`;
-    } else {
-      task.skip(`Skipped, desired count was previously zero`);
-    }
+      })
+      .promise();
+
+    task.output = `Restored desired count to ${serviceState.desired}`;
   }
 
   private async restoreScalableTargets(
     task: ListrTaskWrapper,
-    dryRun: boolean,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
+    dryRun: boolean,
   ): Promise<void> {
     if (
       !serviceState.scalableTargets ||
@@ -223,12 +442,14 @@ export class StopFargateEcsServicesTrick
     }
 
     for (const scalableTarget of serviceState.scalableTargets) {
-      const resourceId = this.getEcsServiceResourceId(
+      const resourceId = StopFargateEcsServicesTrick.getEcsServiceResourceId(
         clusterState.arn,
         serviceState.arn,
       );
       if (dryRun) {
-        task.skip('Skipped due to dry-run');
+        task.skip(
+          `Skipped, would set scalable target min = ${scalableTarget.min} and max = ${scalableTarget.max}`,
+        );
       } else {
         await this.aasClient
           .registerScalableTarget({
@@ -243,113 +464,10 @@ export class StopFargateEcsServicesTrick
     }
   }
 
-  private async getCurrentState(clustersArn: string[]) {
-    return Promise.all(
-      clustersArn.map(
-        async (clusterArn): Promise<EcsClusterState> => {
-          const services = await this.describeAllServices(clusterArn);
-          return {
-            arn: clusterArn,
-            services: await Promise.all(
-              services.map(
-                async (service: AWS.ECS.Service): Promise<EcsServiceState> => {
-                  if (service.serviceArn === undefined) {
-                    throw new Error(
-                      `Unexpected error: serviceArn is missing for ECS service`,
-                    );
-                  }
-                  if (service.desiredCount === undefined) {
-                    throw new Error(
-                      `Unexpected error: desiredCount is missing for ECS service`,
-                    );
-                  }
-
-                  const scalableTargets = await this.describeAllScalableTargets(
-                    service,
-                  );
-                  return {
-                    arn: service.serviceArn,
-                    desired: service.desiredCount,
-                    scalableTargets: scalableTargets.map(st => ({
-                      namespace: 'ecs',
-                      resourceId: st.ResourceId,
-                      scalableDimension: st.ScalableDimension,
-                      min: st.MinCapacity,
-                      max: st.MaxCapacity,
-                    })),
-                  };
-                },
-              ),
-            ),
-          };
-        },
-      ),
-    );
-  }
-
-  private async listServices(clusterArn: string) {
-    return (
-      (
-        await this.ecsClient
-          .listServices({
-            cluster: clusterArn,
-            launchType: 'FARGATE',
-          })
-          .promise()
-      ).serviceArns || []
-    );
-  }
-
-  private async listClusters(): Promise<string[]> {
-    return (await this.ecsClient.listClusters({}).promise()).clusterArns || [];
-  }
-
-  private async describeAllServices(
+  private static getEcsServiceResourceId(
     clusterArn: string,
-  ): Promise<AWS.ECS.Service[]> {
-    const servicesArn = await this.listServices(clusterArn);
-    const chunks = _.chunk<string>(servicesArn, 10);
-    const result = [];
-
-    for (const services of chunks) {
-      const response = await this.ecsClient
-        .describeServices({ services, cluster: clusterArn })
-        .promise();
-
-      result.push(...(response.services || []));
-    }
-
-    return result;
-  }
-
-  private async describeAllScalableTargets(
-    service: AWS.ECS.Service,
-  ): Promise<AWS.ApplicationAutoScaling.ScalableTarget[]> {
-    if (!service.clusterArn) {
-      throw new Error(
-        `Unexpected missing clusterArn for ECS service: ${service}`,
-      );
-    }
-    if (!service.serviceArn) {
-      throw new Error(
-        `Unexpected missing serviceArn for ECS service: ${service}`,
-      );
-    }
-
-    const result = await this.aasClient
-      .describeScalableTargets({
-        ServiceNamespace: 'ecs',
-        ResourceIds: [
-          this.getEcsServiceResourceId(service.clusterArn, service.serviceArn),
-        ],
-        ScalableDimension: 'ecs:service:DesiredCount',
-      })
-      .promise();
-
-    return result.ScalableTargets || [];
-  }
-
-  private getEcsServiceResourceId(clusterArn: string, serviceArn: string) {
+    serviceArn: string,
+  ) {
     const clusterName = clusterArn
       .toString()
       .split('/')

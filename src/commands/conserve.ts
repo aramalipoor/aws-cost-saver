@@ -1,11 +1,11 @@
+import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import AWS from 'aws-sdk';
-import Command, { flags } from '@oclif/command';
 import { writeFileSync, existsSync } from 'fs';
+import Command, { flags } from '@oclif/command';
 import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
-import { configureAWS } from '../aws-configure';
+import { configureAWS } from '../configure-aws';
 import { TrickRegistry } from '../tricks/trick-registry';
 import { TrickInterface } from '../interfaces/trick.interface';
 
@@ -16,6 +16,8 @@ import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../tricks/decrease-dynam
 import { RemoveNatGatewaysTrick } from '../tricks/remove-nat-gateways.trick';
 import { SnapshotRemoveElasticacheRedisTrick } from '../tricks/snapshot-remove-elasticache-redis.trick';
 import { DecreaseKinesisStreamsShardsTrick } from '../tricks/decrease-kinesis-streams-shards.trick';
+
+import { RootState } from '../interfaces/root-state';
 
 export default class Conserve extends Command {
   static tricksEnabledByDefault: readonly string[] = [
@@ -123,47 +125,28 @@ export default class Conserve extends Command {
     this.printBanner(awsConfig, flags);
 
     const tricks = this.getEnabledTricks(flags);
-    const taskList: ListrTask[] = [];
-    const stateRoot: any = {};
+    const rootState: RootState = {};
+    const rootTaskList: ListrTask<RootState>[] = [];
 
     for (const trick of tricks) {
-      taskList.push({
-        title: `${trick.getDisplayName()}`,
-        task: async (ctx, task: ListrTaskWrapper<any>) => {
-          const subListr = new Listr([], {
-            concurrent: trick.canBeConcurrent(),
-            exitOnError: false,
-            // @ts-ignore
-            collapse: false,
-          });
-
-          await trick.conserve(subListr, flags['dry-run']).then(result => {
-            stateRoot[trick.getMachineName()] = result;
-
-            if (!result || (Array.isArray(result) && result.length === 0)) {
-              task.skip('No resources found');
-            }
-          });
-
-          return subListr;
-        },
-        // @ts-ignore
-        collapse: false,
+      rootTaskList.push({
+        title: `${trick.getConserveTitle()}`,
+        task: () => this.createTrickListr(rootState, trick, flags['dry-run']),
       } as ListrTask);
     }
 
-    await new Listr(taskList, {
+    await new Listr<RootState>(rootTaskList, {
       concurrent: true,
       exitOnError: false,
       // @ts-ignore
       collapse: false,
     })
-      .run()
+      .run(rootState)
       .finally(() => {
         if (!flags['no-state-file']) {
           writeFileSync(
             flags['state-file'],
-            JSON.stringify(stateRoot, null, 2),
+            JSON.stringify(rootState, null, 2),
             'utf-8',
           );
           this.log(
@@ -181,10 +164,10 @@ export default class Conserve extends Command {
         }
       })
       .catch(error => {
-        if (error.errors.length < taskList.length) {
+        if (error.errors.length < rootTaskList.length) {
           writeFileSync(
             flags['state-file'],
-            JSON.stringify(stateRoot, null, 2),
+            JSON.stringify(rootState, null, 2),
             'utf-8',
           );
           this.log(
@@ -195,11 +178,40 @@ export default class Conserve extends Command {
         } else {
           this.log(
             `\n${chalk.red('✖')} All ${chalk.red(
-              `${taskList.length} tricks failed`,
+              `${rootTaskList.length} tricks failed`,
             )} with errors.`,
           );
         }
       });
+  }
+
+  private createTrickListr(
+    rootState: RootState,
+    trick: TrickInterface<any>,
+    dryRun: boolean,
+  ) {
+    rootState[trick.getMachineName()] = [];
+
+    return new Listr<any>(
+      [
+        {
+          title: `Fetch current state`,
+          task: (ctx: RootState, task: ListrTaskWrapper<RootState>) =>
+            trick.getCurrentState(task, rootState[trick.getMachineName()]),
+        },
+        {
+          title: `Conserve resources`,
+          task: (ctx: RootState, task: ListrTaskWrapper<RootState>) =>
+            trick.conserve(task, rootState[trick.getMachineName()], dryRun),
+        },
+      ],
+      {
+        concurrent: false,
+        exitOnError: true,
+        // @ts-ignore
+        collapse: false,
+      },
+    );
   }
 
   private getEnabledTricks(flags: Record<string, any>): TrickInterface<any>[] {
@@ -278,7 +290,9 @@ AWS Cost Saver
 
       if (!answers.stateFileOverwrite) {
         this.log(
-          chalk.redBright('\nIgnoring, to avoid overwriting state file!\n'),
+          chalk.redBright(
+            '\nIgnoring, to avoid overwriting state file! Use -n|--no-state-file flag to skip writing the state file.\n',
+          ),
         );
 
         throw new Error('AbortedByUser');

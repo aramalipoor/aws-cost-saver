@@ -1,6 +1,6 @@
 export type DynamoDBTableState = {
   name: string;
-  provisionedThroughput: boolean;
-  rcu: number;
-  wcu: number;
+  provisionedThroughput?: boolean;
+  rcu?: number;
+  wcu?: number;
 };
