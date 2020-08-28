@@ -1,5 +1,5 @@
 import AWS from 'aws-sdk';
-import Listr, { ListrTaskWrapper } from 'listr';
+import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
 
 import { TrickInterface } from '../interfaces/trick.interface';
@@ -21,125 +21,216 @@ export class ShutdownEC2InstancesTrick
     return ShutdownEC2InstancesTrick.machineName;
   }
 
-  getDisplayName(): string {
+  getConserveTitle(): string {
     return 'Shutdown EC2 Instances';
   }
 
-  canBeConcurrent(): boolean {
-    return false;
+  getRestoreTitle(): string {
+    return 'Start EC2 Instances';
+  }
+
+  async getCurrentState(
+    task: ListrTaskWrapper,
+    currentState: ShutdownEC2InstancesState,
+  ): Promise<Listr> {
+    const reservations = await this.listReservations(task);
+
+    if (!reservations || reservations.length === 0) {
+      task.skip('No EC2 instances found');
+      return;
+    }
+
+    const subListr = new Listr({
+      concurrent: 10,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
+
+    for (const reservation of reservations) {
+      subListr.add(
+        reservation.Instances?.map(
+          (instance): ListrTask => {
+            return {
+              title: instance.InstanceId || chalk.italic('<no-instance-id>'),
+              task: async () => {
+                if (
+                  !instance.InstanceId ||
+                  !instance.State ||
+                  !instance.State.Name
+                ) {
+                  throw new Error(
+                    `Unexpected EC2 instance: ${JSON.stringify(instance)}`,
+                  );
+                }
+
+                const nameTag = instance.Tags
+                  ? instance.Tags.filter(
+                      t => t.Key?.toString().toLowerCase() === 'name',
+                    )
+                      .map(t => t.Value)
+                      .join(' ')
+                  : '<no-name>';
+
+                const instanceState: EC2InstanceState = {
+                  id: instance.InstanceId,
+                  state: instance.State.Name,
+                  name: nameTag,
+                };
+
+                currentState.push(instanceState);
+              },
+            };
+          },
+        ) || [],
+      );
+    }
+
+    return subListr;
   }
 
   async conserve(
-    subListr: Listr,
+    task: ListrTaskWrapper,
+    currentState: ShutdownEC2InstancesState,
     dryRun: boolean,
-  ): Promise<ShutdownEC2InstancesState> {
-    const reservations = await this.listReservations();
-    const currentState = await this.getCurrentState(reservations);
+  ): Promise<Listr> {
+    const subListr = new Listr({
+      concurrent: 10,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
 
-    for (const instance of currentState) {
-      subListr.add({
-        title: chalk.blueBright(`${instance.id} / ${instance.name}`),
-        task: (ctx, task) => this.conserveInstance(task, dryRun, instance),
-      });
+    if (currentState && currentState.length > 0) {
+      for (const instance of currentState) {
+        subListr.add({
+          title: chalk.blueBright(`${instance.id} / ${instance.name}`),
+          task: (ctx, task) => this.conserveInstance(task, instance, dryRun),
+        });
+      }
+    } else {
+      task.skip(`No EC2 instances found`);
     }
 
-    return currentState;
+    return subListr;
   }
 
   async restore(
-    subListr: Listr,
-    dryRun: boolean,
+    task: ListrTaskWrapper,
     originalState: ShutdownEC2InstancesState,
-  ): Promise<void> {
-    for (const instance of originalState) {
-      subListr.add({
-        title: chalk.blueBright(instance.id),
-        task: (ctx, task) => this.restoreInstance(task, dryRun, instance),
-      });
+    dryRun: boolean,
+  ): Promise<Listr> {
+    const subListr = new Listr({
+      concurrent: 10,
+      exitOnError: false,
+      // @ts-ignore
+      collapse: false,
+    });
+
+    if (originalState && originalState.length > 0) {
+      for (const instance of originalState) {
+        subListr.add({
+          title: chalk.blueBright(`${instance.id} / ${instance.name}`),
+          task: (ctx, task) => this.restoreInstance(task, instance, dryRun),
+        });
+      }
+    } else {
+      task.skip(`No EC2 instances were conserved`);
     }
+
+    return subListr;
+  }
+
+  private async listReservations(
+    task: ListrTaskWrapper,
+  ): Promise<AWS.EC2.ReservationList> {
+    const reservations: AWS.EC2.ReservationList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'Fetching page 1...';
+    reservations.push(
+      ...((
+        await this.ec2Client.describeInstances({ MaxResults: 1000 }).promise()
+      ).Reservations || []),
+    );
+
+    return reservations;
   }
 
   private async conserveInstance(
     task: ListrTaskWrapper,
-    dryRun: boolean,
     instanceState: EC2InstanceState,
+    dryRun: boolean,
   ): Promise<void> {
-    if (dryRun) {
-      task.skip('Skipped due to dry-run');
-    } else if (instanceState.state === 'running') {
-      await this.ec2Client
-        .stopInstances({
-          InstanceIds: [instanceState.id],
-        })
-        .promise();
-      task.output = 'Stopped';
-    } else {
+    if (instanceState.state !== 'running') {
       task.skip(
         `Not in a "running" state instead in "${instanceState.state}" state`,
       );
+      return;
     }
+
+    if (dryRun) {
+      task.skip('Skipped, would stop the instance');
+      return;
+    }
+
+    // TODO Stop multiple instances at a time
+    task.output = 'Stopping EC2 instance...';
+    await this.ec2Client
+      .stopInstances({
+        InstanceIds: [instanceState.id],
+      })
+      .promise();
+
+    task.output = 'Waiting for EC2 instance to stop...';
+    await this.ec2Client
+      .waitFor('instanceStopped', {
+        InstanceIds: [instanceState.id],
+        $waiter: {
+          delay: 10,
+          maxAttempts: 60,
+        },
+      })
+      .promise();
+
+    task.output = 'Stopped';
   }
 
   private async restoreInstance(
     task: ListrTaskWrapper,
-    dryRun: boolean,
     instanceState: EC2InstanceState,
+    dryRun: boolean,
   ): Promise<void> {
-    if (dryRun) {
-      task.skip(`Skipped due to dry-run`);
-    } else if (instanceState.state === 'running') {
-      await this.ec2Client
-        .startInstances({
-          InstanceIds: [instanceState.id],
-        })
-        .promise();
-      task.output = `Started`;
-    } else {
+    if (instanceState.state !== 'running') {
       task.skip(
         `Was not in a "running" state instead in "${instanceState.state}" state`,
       );
+      return;
     }
-  }
 
-  private getCurrentState(
-    reservations: AWS.EC2.ReservationList,
-  ): EC2InstanceState[] {
-    return ([] as EC2InstanceState[]).concat(
-      ...reservations.map(reservation => {
-        return (
-          reservation.Instances?.map(
-            (instance): EC2InstanceState => {
-              if (
-                !instance.InstanceId ||
-                !instance.State ||
-                !instance.State.Name
-              ) {
-                throw new Error(
-                  `Unexpected EC2 instance: ${JSON.stringify(instance)}`,
-                );
-              }
+    if (dryRun) {
+      task.skip(`Skipped, would start the instance`);
+      return;
+    }
 
-              const nameTag = instance.Tags?.filter(
-                t => t.Key?.toString().toLowerCase() === 'name',
-              )
-                .map(t => t.Value)
-                .join(' ');
+    task.output = 'Starting EC2 instance...';
+    await this.ec2Client
+      .startInstances({
+        InstanceIds: [instanceState.id],
+      })
+      .promise();
 
-              return {
-                id: instance.InstanceId,
-                name: nameTag || '<-no name->',
-                state: instance.State.Name,
-              };
-            },
-          ) || []
-        );
-      }),
-    );
-  }
+    task.output = 'Waiting for EC2 instance to start...';
+    await this.ec2Client
+      .waitFor('instanceRunning', {
+        InstanceIds: [instanceState.id],
+        $waiter: {
+          delay: 15,
+          maxAttempts: 100,
+        },
+      })
+      .promise();
 
-  private async listReservations(): Promise<AWS.EC2.ReservationList> {
-    return (
-      (await this.ec2Client.describeInstances({}).promise()).Reservations || []
-    );
+    task.output = `Started`;
   }
 }
