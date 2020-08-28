@@ -3,6 +3,8 @@ import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
 
 import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+
 import { EC2InstanceState } from '../states/ec2-instance.state';
 
 export type ShutdownEC2InstancesState = EC2InstanceState[];
@@ -32,6 +34,7 @@ export class ShutdownEC2InstancesTrick
   async getCurrentState(
     task: ListrTaskWrapper,
     currentState: ShutdownEC2InstancesState,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const reservations = await this.listReservations(task);
 
@@ -92,7 +95,7 @@ export class ShutdownEC2InstancesTrick
   async conserve(
     task: ListrTaskWrapper,
     currentState: ShutdownEC2InstancesState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
@@ -105,7 +108,7 @@ export class ShutdownEC2InstancesTrick
       for (const instance of currentState) {
         subListr.add({
           title: chalk.blueBright(`${instance.id} / ${instance.name}`),
-          task: (ctx, task) => this.conserveInstance(task, instance, dryRun),
+          task: (ctx, task) => this.conserveInstance(task, instance, options),
         });
       }
     } else {
@@ -118,7 +121,7 @@ export class ShutdownEC2InstancesTrick
   async restore(
     task: ListrTaskWrapper,
     originalState: ShutdownEC2InstancesState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
@@ -131,7 +134,7 @@ export class ShutdownEC2InstancesTrick
       for (const instance of originalState) {
         subListr.add({
           title: chalk.blueBright(`${instance.id} / ${instance.name}`),
-          task: (ctx, task) => this.restoreInstance(task, instance, dryRun),
+          task: (ctx, task) => this.restoreInstance(task, instance, options),
         });
       }
     } else {
@@ -160,7 +163,7 @@ export class ShutdownEC2InstancesTrick
   private async conserveInstance(
     task: ListrTaskWrapper,
     instanceState: EC2InstanceState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (instanceState.state !== 'running') {
       task.skip(
@@ -169,7 +172,7 @@ export class ShutdownEC2InstancesTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip('Skipped, would stop the instance');
       return;
     }
@@ -199,7 +202,7 @@ export class ShutdownEC2InstancesTrick
   private async restoreInstance(
     task: ListrTaskWrapper,
     instanceState: EC2InstanceState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (instanceState.state !== 'running') {
       task.skip(
@@ -208,7 +211,7 @@ export class ShutdownEC2InstancesTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(`Skipped, would start the instance`);
       return;
     }

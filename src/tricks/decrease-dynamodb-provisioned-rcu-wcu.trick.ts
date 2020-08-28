@@ -1,8 +1,10 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+
 import { DynamoDBTableState } from '../states/dynamodb-table.state';
 
 export type DecreaseDynamoDBProvisionedRcuWcuState = DynamoDBTableState[];
@@ -32,27 +34,27 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   async getCurrentState(
     task: ListrTaskWrapper,
     currentState: DecreaseDynamoDBProvisionedRcuWcuState,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const tableNames = await this.listTableNames(task);
-
-    if (!tableNames || tableNames.length === 0) {
-      task.skip('No DynamoDB tables found');
-      return;
-    }
 
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!tableNames || tableNames.length === 0) {
+      task.skip('No DynamoDB tables found');
+      return subListr;
+    }
 
     subListr.add(
       tableNames.map(
         (tableName): ListrTask => {
-          const tableState: DynamoDBTableState = {
+          const tableState = {
             name: tableName,
-          };
+          } as DynamoDBTableState;
           currentState.push(tableState);
           return {
             title: tableName,
@@ -68,21 +70,20 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   async conserve(
     task: ListrTaskWrapper,
     currentState: DecreaseDynamoDBProvisionedRcuWcuState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
           title: `${chalk.blueBright(table.name)}`,
           task: (ctx, task) =>
-            this.conserveTableProvisionedRcuWcu(task, table, dryRun),
+            this.conserveTableProvisionedRcuWcu(task, table, options),
         });
       }
     } else {
@@ -95,21 +96,20 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   async restore(
     task: ListrTaskWrapper,
     currentState: DecreaseDynamoDBProvisionedRcuWcuState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
           title: `${chalk.blueBright(table.name)}`,
           task: (ctx, task) =>
-            this.restoreTableProvisionedRcuWcu(task, table, dryRun),
+            this.restoreTableProvisionedRcuWcu(task, table, options),
         });
       }
     } else {
@@ -151,14 +151,14 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     }
 
     tableState.provisionedThroughput = true;
-    tableState.rcu = provisionedThroughput.ReadCapacityUnits;
-    tableState.wcu = provisionedThroughput.WriteCapacityUnits;
+    tableState.rcu = provisionedThroughput.ReadCapacityUnits || 1;
+    tableState.wcu = provisionedThroughput.WriteCapacityUnits || 1;
   }
 
   private async conserveTableProvisionedRcuWcu(
     task: ListrTaskWrapper,
     tableState: DynamoDBTableState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (!tableState.provisionedThroughput) {
       task.skip(`Provisioned throughput is not configured`);
@@ -170,7 +170,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip('Skipped, would configure RCU = 1 WCU = 1');
       return;
     }
@@ -192,14 +192,14 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   private async restoreTableProvisionedRcuWcu(
     task: ListrTaskWrapper,
     tableState: DynamoDBTableState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (!tableState.provisionedThroughput) {
       task.skip(`Provisioned throughput was not configured`);
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(
         `Skipped, would configure RCU = ${tableState.rcu} WCU = ${tableState.wcu}`,
       );

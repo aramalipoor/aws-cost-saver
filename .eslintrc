@@ -3,7 +3,13 @@
     "no-warning-comments": "off",
     "no-await-in-loop": "off",
     "@typescript-eslint/ban-ts-ignore": "off",
-    "unicorn/no-await-in-loop": "off"
+    "unicorn/no-await-in-loop": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "args": "none"
+      }
+    ]
   },
   "extends": [
     "oclif",

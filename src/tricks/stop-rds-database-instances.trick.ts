@@ -3,6 +3,8 @@ import chalk from 'chalk';
 import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+
 import { RdsDatabaseState } from '../states/rds-database.state';
 
 export type StopRdsDatabaseInstancesState = RdsDatabaseState[];
@@ -32,6 +34,7 @@ export class StopRdsDatabaseInstancesTrick
   async getCurrentState(
     task: ListrTaskWrapper,
     currentState: StopRdsDatabaseInstancesState,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const databases = await this.listDatabases(task);
 
@@ -82,7 +85,7 @@ export class StopRdsDatabaseInstancesTrick
   async conserve(
     task: ListrTaskWrapper,
     currentState: StopRdsDatabaseInstancesState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
@@ -95,7 +98,8 @@ export class StopRdsDatabaseInstancesTrick
       for (const database of currentState) {
         subListr.add({
           title: chalk.blueBright(`${database.identifier}`),
-          task: (ctx, task) => this.conserveDatabase(task, database, dryRun),
+          task: (ctx, task) =>
+            this.conserveDatabase(task, database, options.dryRun),
         });
       }
     } else {
@@ -108,7 +112,7 @@ export class StopRdsDatabaseInstancesTrick
   async restore(
     task: ListrTaskWrapper,
     originalState: StopRdsDatabaseInstancesState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
@@ -121,7 +125,8 @@ export class StopRdsDatabaseInstancesTrick
       for (const database of originalState) {
         subListr.add({
           title: chalk.blueBright(`${database.identifier}`),
-          task: (ctx, task) => this.restoreDatabase(task, database, dryRun),
+          task: (ctx, task) =>
+            this.restoreDatabase(task, database, options.dryRun),
         });
       }
     } else {
@@ -134,7 +139,7 @@ export class StopRdsDatabaseInstancesTrick
   private async conserveDatabase(
     task: ListrTaskWrapper,
     databaseState: RdsDatabaseState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (databaseState.status !== 'available') {
       task.skip(
@@ -143,7 +148,7 @@ export class StopRdsDatabaseInstancesTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip('Skipped, would stop the RDS instance');
       return;
     }
@@ -161,7 +166,7 @@ export class StopRdsDatabaseInstancesTrick
   private async restoreDatabase(
     task: ListrTaskWrapper,
     databaseState: RdsDatabaseState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (databaseState.status !== 'available') {
       task.skip(
@@ -170,7 +175,7 @@ export class StopRdsDatabaseInstancesTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip('Skipped, would start RDS instance');
       return;
     }
