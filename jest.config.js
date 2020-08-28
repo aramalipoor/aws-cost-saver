@@ -4,6 +4,7 @@ const config = {
   transform: {
     '^.+\\.(ts)$': 'ts-jest',
   },
+  collectCoverage: true,
 };
 
 module.exports = config;

@@ -29,6 +29,7 @@
     "@types/lodash": "^4.14.159",
     "@types/node": "^10.17.28",
     "aws-sdk-mock": "^5.1.0",
+    "codecov": "^3.7.2",
     "eslint": "^5.16.0",
     "eslint-config-oclif": "^3.1.0",
     "eslint-config-oclif-typescript": "^0.1.0",
