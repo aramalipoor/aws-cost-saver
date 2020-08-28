@@ -1,8 +1,7 @@
 *-debug.log
 *-error.log
-.nyc_output
 lib
-dist
+coverage
 node_modules
 oclif.manifest.json
 *.tgz

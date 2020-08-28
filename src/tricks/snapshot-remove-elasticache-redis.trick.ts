@@ -3,6 +3,8 @@ import chalk from 'chalk';
 import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+
 import { ElasticacheReplicationGroupState } from '../states/elasticache-replication-group.state';
 
 export type SnapshotRemoveElasticacheRedisState = ElasticacheReplicationGroupState[];
@@ -82,7 +84,7 @@ export class SnapshotRemoveElasticacheRedisTrick
   async conserve(
     task: ListrTaskWrapper,
     currentState: SnapshotRemoveElasticacheRedisState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
@@ -96,7 +98,7 @@ export class SnapshotRemoveElasticacheRedisTrick
         subListr.add({
           title: chalk.blueBright(replicationGroup.id),
           task: (ctx, task) =>
-            this.conserveReplicationGroup(task, replicationGroup, dryRun),
+            this.conserveReplicationGroup(task, replicationGroup, options),
         });
       }
     } else {
@@ -109,7 +111,7 @@ export class SnapshotRemoveElasticacheRedisTrick
   async restore(
     task: ListrTaskWrapper,
     originalState: SnapshotRemoveElasticacheRedisState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 10,
@@ -123,7 +125,7 @@ export class SnapshotRemoveElasticacheRedisTrick
         subListr.add({
           title: chalk.blueBright(replicationGroup.id),
           task: (ctx, task) =>
-            this.restoreReplicationGroup(task, replicationGroup, dryRun),
+            this.restoreReplicationGroup(task, replicationGroup, options),
         });
       }
     } else {
@@ -136,7 +138,7 @@ export class SnapshotRemoveElasticacheRedisTrick
   private async conserveReplicationGroup(
     task: ListrTaskWrapper,
     replicationGroupState: ElasticacheReplicationGroupState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (replicationGroupState.status !== 'available') {
       task.skip(
@@ -145,7 +147,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip('Skipped, would take a snapshot and delete');
       return;
     }
@@ -176,7 +178,7 @@ export class SnapshotRemoveElasticacheRedisTrick
   private async restoreReplicationGroup(
     task: ListrTaskWrapper,
     replicationGroupState: ElasticacheReplicationGroupState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (!replicationGroupState.snapshotName) {
       throw new Error(`Unexpected error: snapshotName is missing in state`);
@@ -198,7 +200,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(
         `Skipped, would re-create the cluster and remove the snapshot ${replicationGroupState.snapshotName}`,
       );

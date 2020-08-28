@@ -3,6 +3,8 @@ import chalk from 'chalk';
 import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+
 import { NatGatewayState } from '../states/nat-gateway.state';
 
 export type RemoveNatGatewaysState = NatGatewayState[];
@@ -32,6 +34,7 @@ export class RemoveNatGatewaysTrick
   async getCurrentState(
     task: ListrTaskWrapper,
     currentState: RemoveNatGatewaysState,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const natGateways = await this.listNatGateways(task);
 
@@ -82,7 +85,7 @@ export class RemoveNatGatewaysTrick
   async conserve(
     task: ListrTaskWrapper,
     currentState: RemoveNatGatewaysState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 1,
@@ -96,7 +99,7 @@ export class RemoveNatGatewaysTrick
         title: chalk.blueBright(
           `${natGateway.id} / ${RemoveNatGatewaysTrick.getNameTag(natGateway)}`,
         ),
-        task: (ctx, task) => this.conserveNatGateway(task, natGateway, dryRun),
+        task: (ctx, task) => this.conserveNatGateway(task, natGateway, options),
       });
     }
 
@@ -106,7 +109,7 @@ export class RemoveNatGatewaysTrick
   async restore(
     task: ListrTaskWrapper,
     originalState: RemoveNatGatewaysState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 1,
@@ -118,7 +121,7 @@ export class RemoveNatGatewaysTrick
     for (const natGateway of originalState) {
       subListr.add({
         title: chalk.blueBright(natGateway.id),
-        task: (ctx, task) => this.restoreNatGateway(task, natGateway, dryRun),
+        task: (ctx, task) => this.restoreNatGateway(task, natGateway, options),
       });
     }
 
@@ -128,9 +131,9 @@ export class RemoveNatGatewaysTrick
   private async conserveNatGateway(
     task: ListrTaskWrapper,
     natGateway: NatGatewayState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(`Skipped, would remove NAT Gateway`);
       return;
     }
@@ -148,12 +151,12 @@ export class RemoveNatGatewaysTrick
   private async restoreNatGateway(
     task: ListrTaskWrapper,
     natGateway: NatGatewayState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     const allocationId =
       natGateway.allocationIds && natGateway.allocationIds[0];
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(
         `Skipped, would create NAT Gateway on subnet = ${natGateway.subnetId} and allocate EIP = ${allocationId}`,
       );

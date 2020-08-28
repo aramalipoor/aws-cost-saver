@@ -18,6 +18,7 @@ import { SnapshotRemoveElasticacheRedisTrick } from '../tricks/snapshot-remove-e
 import { DecreaseKinesisStreamsShardsTrick } from '../tricks/decrease-kinesis-streams-shards.trick';
 
 import { RootState } from '../interfaces/root-state';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
 
 export default class Conserve extends Command {
   static tricksEnabledByDefault: readonly string[] = [
@@ -127,11 +128,14 @@ export default class Conserve extends Command {
     const tricks = this.getEnabledTricks(flags);
     const rootState: RootState = {};
     const rootTaskList: ListrTask<RootState>[] = [];
+    const options: TrickOptionsInterface = {
+      dryRun: flags['dry-run'],
+    };
 
     for (const trick of tricks) {
       rootTaskList.push({
         title: `${trick.getConserveTitle()}`,
-        task: () => this.createTrickListr(rootState, trick, flags['dry-run']),
+        task: () => this.createTrickListr(rootState, trick, options),
       } as ListrTask);
     }
 
@@ -188,7 +192,7 @@ export default class Conserve extends Command {
   private createTrickListr(
     rootState: RootState,
     trick: TrickInterface<any>,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ) {
     rootState[trick.getMachineName()] = [];
 
@@ -197,12 +201,16 @@ export default class Conserve extends Command {
         {
           title: `Fetch current state`,
           task: (ctx: RootState, task: ListrTaskWrapper<RootState>) =>
-            trick.getCurrentState(task, rootState[trick.getMachineName()]),
+            trick.getCurrentState(
+              task,
+              rootState[trick.getMachineName()],
+              options,
+            ),
         },
         {
           title: `Conserve resources`,
           task: (ctx: RootState, task: ListrTaskWrapper<RootState>) =>
-            trick.conserve(task, rootState[trick.getMachineName()], dryRun),
+            trick.conserve(task, rootState[trick.getMachineName()], options),
         },
       ],
       {

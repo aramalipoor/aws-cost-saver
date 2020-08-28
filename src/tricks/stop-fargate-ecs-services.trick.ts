@@ -4,6 +4,8 @@ import chalk from 'chalk';
 import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+
 import { EcsClusterState } from '../states/ecs-cluster.state';
 import { EcsServiceState } from '../states/ecs-service.state';
 
@@ -37,6 +39,7 @@ export class StopFargateEcsServicesTrick
   async getCurrentState(
     task: ListrTaskWrapper,
     currentState: StopFargateEcsServicesState,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const clustersArn = await this.listClusters(task);
 
@@ -74,7 +77,7 @@ export class StopFargateEcsServicesTrick
   async conserve(
     task: ListrTaskWrapper,
     currentState: StopFargateEcsServicesState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 3,
@@ -98,7 +101,7 @@ export class StopFargateEcsServicesTrick
                 {
                   title: 'Desired count',
                   task: (ctx, task) =>
-                    this.conserveDesiredCount(task, cluster, service, dryRun),
+                    this.conserveDesiredCount(task, cluster, service, options),
                 },
                 {
                   title: 'Auto scaling',
@@ -107,7 +110,7 @@ export class StopFargateEcsServicesTrick
                       task,
                       cluster,
                       service,
-                      dryRun,
+                      options,
                     ),
                 },
               ],
@@ -128,7 +131,7 @@ export class StopFargateEcsServicesTrick
   async restore(
     task: ListrTaskWrapper,
     originalState: StopFargateEcsServicesState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 3,
@@ -152,12 +155,17 @@ export class StopFargateEcsServicesTrick
                 {
                   title: 'Desired count',
                   task: (ctx, task) =>
-                    this.restoreDesiredCount(task, cluster, service, dryRun),
+                    this.restoreDesiredCount(task, cluster, service, options),
                 },
                 {
                   title: 'Auto scaling',
                   task: (ctx, task) =>
-                    this.restoreScalableTargets(task, cluster, service, dryRun),
+                    this.restoreScalableTargets(
+                      task,
+                      cluster,
+                      service,
+                      options,
+                    ),
                 },
               ],
               {
@@ -321,14 +329,14 @@ export class StopFargateEcsServicesTrick
     task: ListrTaskWrapper,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (serviceState.desired < 1) {
       task.skip(`Skipped, desired count is already zero`);
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip('Skipped, would set tasks desired count to 0');
       return;
     }
@@ -357,7 +365,7 @@ export class StopFargateEcsServicesTrick
     task: ListrTaskWrapper,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (
       !serviceState.scalableTargets ||
@@ -373,7 +381,7 @@ export class StopFargateEcsServicesTrick
         serviceState.arn,
       );
 
-      if (dryRun) {
+      if (options.dryRun) {
         task.skip('Skipped, would set scalable target min = 0 and max = 0');
       } else {
         await this.aasClient
@@ -393,14 +401,14 @@ export class StopFargateEcsServicesTrick
     task: ListrTaskWrapper,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (serviceState.desired < 1) {
       task.skip(`Skipped, desired count was previously zero`);
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(
         `Skipped, would update desired count to ${serviceState.desired}`,
       );
@@ -431,7 +439,7 @@ export class StopFargateEcsServicesTrick
     task: ListrTaskWrapper,
     clusterState: EcsClusterState,
     serviceState: EcsServiceState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (
       !serviceState.scalableTargets ||
@@ -446,7 +454,7 @@ export class StopFargateEcsServicesTrick
         clusterState.arn,
         serviceState.arn,
       );
-      if (dryRun) {
+      if (options.dryRun) {
         task.skip(
           `Skipped, would set scalable target min = ${scalableTarget.min} and max = ${scalableTarget.max}`,
         );

@@ -3,6 +3,8 @@ import chalk from 'chalk';
 import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+
 import { KinesisStreamState } from '../states/kinesis-stream.state';
 
 export type DecreaseKinesisStreamsShardsState = KinesisStreamState[];
@@ -32,6 +34,7 @@ export class DecreaseKinesisStreamsShardsTrick
   async getCurrentState(
     task: ListrTaskWrapper,
     currentState: DecreaseKinesisStreamsShardsState,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const streamNames = await this.listKinesisStreamsNames(task);
 
@@ -68,7 +71,7 @@ export class DecreaseKinesisStreamsShardsTrick
   async conserve(
     task: ListrTaskWrapper,
     currentState: DecreaseKinesisStreamsShardsState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 5,
@@ -81,7 +84,7 @@ export class DecreaseKinesisStreamsShardsTrick
       for (const stream of currentState) {
         subListr.add({
           title: `${chalk.blueBright(stream.name)}`,
-          task: (ctx, task) => this.conserveStreamShards(task, stream, dryRun),
+          task: (ctx, task) => this.conserveStreamShards(task, stream, options),
         });
       }
     } else {
@@ -94,7 +97,7 @@ export class DecreaseKinesisStreamsShardsTrick
   async restore(
     task: ListrTaskWrapper,
     originalState: DecreaseKinesisStreamsShardsState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
       concurrent: 5,
@@ -107,7 +110,7 @@ export class DecreaseKinesisStreamsShardsTrick
       for (const table of originalState) {
         subListr.add({
           title: chalk.blueBright(table.name),
-          task: (ctx, task) => this.restoreStreamShards(task, table, dryRun),
+          task: (ctx, task) => this.restoreStreamShards(task, table, options),
         });
       }
     } else {
@@ -146,7 +149,7 @@ export class DecreaseKinesisStreamsShardsTrick
   private async conserveStreamShards(
     task: ListrTaskWrapper,
     streamState: KinesisStreamState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (streamState.state !== 'ACTIVE') {
       task.skip(`State is not Active, it is ${streamState.state} instead.`);
@@ -158,7 +161,7 @@ export class DecreaseKinesisStreamsShardsTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(`Skipped, would decrease number of shards to 1`);
       return;
     }
@@ -193,7 +196,7 @@ export class DecreaseKinesisStreamsShardsTrick
   private async restoreStreamShards(
     task: ListrTaskWrapper,
     streamState: KinesisStreamState,
-    dryRun: boolean,
+    options: TrickOptionsInterface,
   ): Promise<void> {
     if (streamState.shards < 2) {
       task.skip(`Shards were already at minimum of 1`);
@@ -215,7 +218,7 @@ export class DecreaseKinesisStreamsShardsTrick
       return;
     }
 
-    if (dryRun) {
+    if (options.dryRun) {
       task.skip(
         `Skipped, would increase number of shards to ${streamState.shards}`,
       );
