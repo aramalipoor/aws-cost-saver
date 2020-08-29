@@ -4,6 +4,7 @@
     "./**/*.ts"
   ],
   "compilerOptions": {
+    "rootDirs": ["./", "../src"],
     "noEmit": true
   },
   "references": [

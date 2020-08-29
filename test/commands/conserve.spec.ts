@@ -2,39 +2,22 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { Config } from '@oclif/config';
 
-import Conserve from '../../src/commands/conserve';
+import { mockSpecificMethods } from '../util';
 
 jest.mock('fs');
 import fs from 'fs';
-
 jest.mock('inquirer');
 import inquirer from 'inquirer';
-
 jest.mock('../../src/configure-aws');
 import { configureAWS } from '../../src/configure-aws';
 
+import Conserve from '../../src/commands/conserve';
 import { StopRdsDatabaseInstancesTrick } from '../../src/tricks/stop-rds-database-instances.trick';
 import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../../src/tricks/decrease-dynamodb-provisioned-rcu-wcu.trick';
 import { ShutdownEC2InstancesTrick } from '../../src/tricks/shutdown-ec2-instances.trick';
 
-export function mockSpecificMethods(
-  Klass: any,
-  functionNames: string | string[],
-): any {
-  if (!Array.isArray(functionNames)) functionNames = [functionNames];
-
-  class MockedKlass extends Klass {}
-
-  const functionNamesLenght = functionNames.length;
-  for (let index = 0; index < functionNamesLenght; ++index) {
-    const name = functionNames[index];
-    MockedKlass.prototype[name] = jest.fn();
-  }
-
-  return MockedKlass;
-}
-
 const MockedConserve = mockSpecificMethods(Conserve, 'log');
+const mockedLog = MockedConserve.prototype.log;
 
 async function runConserve(argv: string[]) {
   const config = new Config({ root: '../../src', ignoreManifest: true });
@@ -264,6 +247,9 @@ describe('conserve', () => {
       'stop-rds-database-instances',
     ]);
 
+    expect(mockedLog).toHaveBeenCalledWith(
+      expect.stringMatching(/partially conserved/gi),
+    );
     expect(updateTableSpy).toHaveBeenCalledTimes(1);
     expect(stopDBInstanceSpy).toHaveBeenCalledTimes(1);
     expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
@@ -367,6 +353,9 @@ describe('conserve', () => {
       'stop-rds-database-instances',
     ]);
 
+    expect(mockedLog).toHaveBeenCalledWith(
+      expect.stringMatching(/All .* tricks failed/gi),
+    );
     expect(updateTableSpy).toHaveBeenCalledTimes(1);
     expect(stopDBInstanceSpy).toHaveBeenCalledTimes(1);
     expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
