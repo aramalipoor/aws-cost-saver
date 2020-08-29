@@ -194,6 +194,7 @@ export class StopRdsDatabaseInstancesTrick
     } catch (error) {
       if (error.code === 'InvalidDBInstanceState') {
         task.skip('Skipped, database is not in "stopped" state.');
+        return;
       }
 
       throw error;
