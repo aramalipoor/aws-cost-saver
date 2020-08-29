@@ -125,8 +125,8 @@ export class DecreaseKinesisStreamsShardsTrick
     // TODO Add logic to go through all pages
     task.output = 'Fetching page 1...';
     streamNames.push(
-      ...((await this.ksClient.listStreams({ Limit: 100 }).promise())
-        .StreamNames || []),
+      ...(await this.ksClient.listStreams({ Limit: 100 }).promise())
+        .StreamNames,
     );
 
     return streamNames;
@@ -195,18 +195,13 @@ export class DecreaseKinesisStreamsShardsTrick
     streamState: KinesisStreamState,
     options: TrickOptionsInterface,
   ): Promise<void> {
-    if (streamState.shards < 2) {
-      task.skip(`Shards were already at minimum of 1`);
+    if (streamState.state !== 'ACTIVE') {
+      task.skip(`State was not Active, it was ${streamState.state} instead.`);
       return;
     }
 
-    const streamSummary = await this.getStreamSummary(streamState.name);
-    const currentShards = streamSummary.OpenShardCount;
-
-    if (currentShards >= streamState.shards) {
-      task.skip(
-        `Stream shards are already configured to ${currentShards}. Previous number of shards: ${streamState.shards}`,
-      );
+    if (streamState.shards < 2) {
+      task.skip(`Shards were already at minimum of 1`);
       return;
     }
 
@@ -218,6 +213,16 @@ export class DecreaseKinesisStreamsShardsTrick
     if (options.dryRun) {
       task.skip(
         `Skipped, would increase number of shards to ${streamState.shards}`,
+      );
+      return;
+    }
+
+    const streamSummary = await this.getStreamSummary(streamState.name);
+    const currentShards = streamSummary.OpenShardCount;
+
+    if (currentShards >= streamState.shards) {
+      task.skip(
+        `Stream shards are already configured to ${currentShards}. Previous number of shards: ${streamState.shards}`,
       );
       return;
     }
