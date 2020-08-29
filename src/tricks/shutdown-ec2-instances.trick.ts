@@ -68,7 +68,8 @@ export class ShutdownEC2InstancesTrick
 
                 const nameTag = instance.Tags
                   ? instance.Tags.filter(
-                      t => t.Key?.toString().toLowerCase() === 'name',
+                      t =>
+                        (t.Key as string).toString().toLowerCase() === 'name',
                     )
                       .map(t => t.Value)
                       .join(' ')
