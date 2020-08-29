@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -41,9 +41,8 @@ export class RemoveNatGatewaysTrick
     const subListr = new Listr({
       concurrent: true,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     subListr.add(
       natGateways.map(
@@ -90,9 +89,8 @@ export class RemoveNatGatewaysTrick
     const subListr = new Listr({
       concurrent: 1,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     for (const natGateway of currentState) {
       subListr.add({
@@ -114,9 +112,8 @@ export class RemoveNatGatewaysTrick
     const subListr = new Listr({
       concurrent: 1,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     for (const natGateway of originalState) {
       subListr.add({

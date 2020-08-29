@@ -14,7 +14,7 @@ beforeAll(async done => {
   done();
 });
 
-describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
+describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
   let task: ListrTaskWrapper;
 
   beforeEach(() => {
@@ -180,34 +180,6 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
   it('conserves provisioned RCU and WCU', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    AWSMock.mock(
-      'DynamoDB',
-      'listTables',
-      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
-        callback(null, { TableNames: ['foo'] });
-      },
-    );
-
-    AWSMock.mock(
-      'DynamoDB',
-      'describeTable',
-      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
-        if (params.TableName === 'foo') {
-          callback(null, {
-            Table: {
-              TableName: 'foo',
-              ProvisionedThroughput: {
-                WriteCapacityUnits: 15,
-                ReadCapacityUnits: 17,
-              },
-            },
-          } as AWS.DynamoDB.Types.DescribeTableOutput);
-        } else {
-          callback(new Error('Table not exists'));
-        }
-      },
-    );
-
     const updateTableSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
@@ -216,13 +188,14 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
 
     const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
-    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
-    const stateListr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
-    stateListr.setRenderer(SilentRenderer);
-    await stateListr.run({});
-
+    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [
+      {
+        name: 'foo',
+        provisionedThroughput: true,
+        wcu: 22,
+        rcu: 33,
+      },
+    ];
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });

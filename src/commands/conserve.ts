@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import inquirer from 'inquirer';
 import { writeFileSync, existsSync } from 'fs';
 import Command, { flags } from '@oclif/command';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { configureAWS } from '../configure-aws';
 import { TrickRegistry } from '../tricks/trick-registry';
@@ -140,11 +140,11 @@ export default class Conserve extends Command {
     }
 
     await new Listr<RootState>(rootTaskList, {
+      renderer: process.env.NODE_ENV === 'test' ? 'silent' : 'default',
       concurrent: true,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    })
+    } as ListrOptions)
       .run(rootState)
       .finally(() => {
         if (!flags['no-state-file']) {
@@ -169,11 +169,6 @@ export default class Conserve extends Command {
       })
       .catch(error => {
         if (error.errors.length < rootTaskList.length) {
-          writeFileSync(
-            flags['state-file'],
-            JSON.stringify(rootState, null, 2),
-            'utf-8',
-          );
           this.log(
             `\n${chalk.yellow('✔')} Partially conserved, with ${chalk.red(
               `${error.errors.length} error(s)`,
@@ -216,9 +211,8 @@ export default class Conserve extends Command {
       {
         concurrent: false,
         exitOnError: true,
-        // @ts-ignore
         collapse: false,
-      },
+      } as ListrOptions,
     );
   }
 
@@ -235,8 +229,8 @@ export default class Conserve extends Command {
     }
 
     if (flags['ignore-trick'] && flags['ignore-trick'].length > 0) {
-      enabledTricks = enabledTricks.filter(disabledTrickName =>
-        flags['ignore-trick'].includes(disabledTrickName),
+      enabledTricks = enabledTricks.filter(
+        trickName => !flags['ignore-trick'].includes(trickName),
       );
     }
 
@@ -258,7 +252,7 @@ export default class Conserve extends Command {
   }
 
   private printBanner(awsConfig: AWS.Config, flags: Record<string, any>) {
-    const awsRegion = awsConfig.region || flags.region;
+    const awsRegion = awsConfig.region;
     const awsProfile = (awsConfig.credentials as any).profile || flags.profile;
 
     this.log(`

@@ -2,11 +2,12 @@ import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { Command, flags } from '@oclif/command';
-import Listr, { ListrTask } from 'listr';
+import Listr, { ListrOptions, ListrTask } from 'listr';
 
 import { TrickRegistry } from '../tricks/trick-registry';
 import { configureAWS } from '../configure-aws';
 import { RootState } from '../interfaces/root-state';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
 
 export default class Restore extends Command {
   static description =
@@ -52,6 +53,9 @@ export default class Restore extends Command {
     const stateContent = readFileSync(flags['state-file'], 'utf-8');
     const rootState: RootState = JSON.parse(stateContent.toString());
     const taskList: ListrTask[] = [];
+    const options: TrickOptionsInterface = {
+      dryRun: flags['dry-run'],
+    };
 
     for (const trick of tricksRegistry.all()) {
       taskList.push({
@@ -62,11 +66,10 @@ export default class Restore extends Command {
           }
 
           return trick
-            .restore(task, rootState[trick.getMachineName()], flags['dry-run'])
+            .restore(task, rootState[trick.getMachineName()], options)
             .catch(task.report);
         },
         exitOnError: false,
-        // @ts-ignore
         collapse: false,
       } as ListrTask);
     }
@@ -74,9 +77,8 @@ export default class Restore extends Command {
     await new Listr<RootState>(taskList, {
       concurrent: true,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    })
+    } as ListrOptions)
       .run()
       .then(() => {
         if (flags['dry-run']) {

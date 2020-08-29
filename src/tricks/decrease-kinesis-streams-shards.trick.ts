@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -38,24 +38,23 @@ export class DecreaseKinesisStreamsShardsTrick
   ): Promise<Listr> {
     const streamNames = await this.listKinesisStreamsNames(task);
 
-    if (!streamNames || streamNames.length === 0) {
-      task.skip('No Kinesis Streams found');
-      return;
-    }
-
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!streamNames || streamNames.length === 0) {
+      task.skip('No Kinesis Streams found');
+      return subListr;
+    }
 
     subListr.add(
       streamNames.map(
         (streamName): ListrTask => {
-          const streamState: KinesisStreamState = {
+          const streamState = {
             name: streamName,
-          };
+          } as KinesisStreamState;
           currentState.push(streamState);
           return {
             title: streamName,
@@ -76,9 +75,8 @@ export class DecreaseKinesisStreamsShardsTrick
     const subListr = new Listr({
       concurrent: 5,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const stream of currentState) {
@@ -102,9 +100,8 @@ export class DecreaseKinesisStreamsShardsTrick
     const subListr = new Listr({
       concurrent: 5,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (originalState && originalState.length > 0) {
       for (const table of originalState) {

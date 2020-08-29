@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -37,17 +37,16 @@ export class SnapshotRemoveElasticacheRedisTrick
   ): Promise<Listr> {
     const replicationGroups = await this.listReplicationGroups(task);
 
-    if (!replicationGroups || replicationGroups.length === 0) {
-      task.skip('No ElastiCache Redis clusters found');
-      return;
-    }
-
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!replicationGroups || replicationGroups.length === 0) {
+      task.skip('No ElastiCache Redis clusters found');
+      return subListr;
+    }
 
     subListr.add(
       replicationGroups.map(
@@ -58,10 +57,10 @@ export class SnapshotRemoveElasticacheRedisTrick
             );
           }
 
-          const replicationGroupState: ElasticacheReplicationGroupState = {
+          const replicationGroupState = {
             id: replicationGroup.ReplicationGroupId,
-            status: replicationGroup.Status,
-          };
+            status: replicationGroup.Status || 'unknown',
+          } as ElasticacheReplicationGroupState;
 
           currentState.push(replicationGroupState);
 
@@ -89,9 +88,8 @@ export class SnapshotRemoveElasticacheRedisTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const replicationGroup of currentState) {
@@ -116,9 +114,8 @@ export class SnapshotRemoveElasticacheRedisTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (originalState && originalState.length > 0) {
       for (const replicationGroup of originalState) {

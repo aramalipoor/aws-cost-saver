@@ -1,4 +1,5 @@
 {
+  "parser": "@typescript-eslint/parser",
   "rules": {
     "no-warning-comments": "off",
     "no-await-in-loop": "off",
