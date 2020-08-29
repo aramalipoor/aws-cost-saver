@@ -1,5 +1,6 @@
 aws-cost-saver
 =======================
+[![CircleCI](https://circleci.com/gh/aramalipoor/aws-cost-saver.svg?style=svg)](https://circleci.com/gh/aramalipoor/aws-cost-saver)
 [![codecov](https://codecov.io/gh/aramalipoor/aws-cost-saver/branch/master/graph/badge.svg)](https://codecov.io/gh/aramalipoor/aws-cost-saver)
 
 A tiny CLI tool to help save costs in development environments when you're asleep and don't need them!
