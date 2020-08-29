@@ -49,7 +49,7 @@
   },
   "files": [
     "/bin",
-    "/lib",
+    "/dist",
     "/npm-shrinkwrap.json",
     "/oclif.manifest.json"
   ],
@@ -60,9 +60,9 @@
     "cost-saving"
   ],
   "license": "MIT",
-  "main": "lib/index.js",
+  "main": "dist/index.js",
   "oclif": {
-    "commands": "./lib/commands",
+    "commands": "./dist/commands",
     "bin": "aws-cost-saver",
     "plugins": [
       "@oclif/plugin-help"
@@ -72,8 +72,8 @@
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
     "posttest": "eslint . --ext .ts --config .eslintrc",
-    "prepack": "rm -rf lib && tsc -b && oclif-dev manifest",
+    "prepack": "rm -rf dist && tsc -b && oclif-dev manifest",
     "test": "jest --coverage"
   },
-  "types": "lib/index.d.ts"
+  "types": "dist/index.d.ts"
 }

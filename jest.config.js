@@ -5,6 +5,11 @@ const config = {
     '^.+\\.(ts)$': 'ts-jest',
   },
   collectCoverage: true,
+  globals: {
+    'ts-jest': {
+      tsConfig: 'test/tsconfig.json',
+    },
+  },
 };
 
 module.exports = config;
