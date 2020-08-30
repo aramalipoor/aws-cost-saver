@@ -1,3 +1,10 @@
+## [0.0.9](https://github.com/aramalipoor/aws-cost-saver) (XXXX-XX-XX)
+* Add scaledown-auto-scaling-groups trick ([#23](https://github.com/aramalipoor/aws-cost-saver/pull/23))
+* Add stop-rds-database-clusters trick ([#22](https://github.com/aramalipoor/aws-cost-saver/pull/22))
+* Restore NAT Gateway routes on restore command ([#20](https://github.com/aramalipoor/aws-cost-saver/pull/20))
+* Added unit tests with 100% coverage ([#20](https://github.com/aramalipoor/aws-cost-saver/pull/20))
+* Refactor the code to be more testable ([#17](https://github.com/aramalipoor/aws-cost-saver/pull/17))
+
 ## [0.0.8](https://github.com/aramalipoor/aws-cost-saver) (2020-08-23)
 * Add decrease-kinesis-streams-shards trick ([#13](https://github.com/aramalipoor/aws-cost-saver/pull/13))
 
