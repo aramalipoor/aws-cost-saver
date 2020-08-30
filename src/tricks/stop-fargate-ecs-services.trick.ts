@@ -205,7 +205,7 @@ export class StopFargateEcsServicesTrick
 
           const serviceState: EcsServiceState = {
             arn: service.serviceArn,
-            desired: service.desiredCount || 0,
+            desired: service.desiredCount as number,
             scalableTargets: [],
           };
 

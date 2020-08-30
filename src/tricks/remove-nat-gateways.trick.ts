@@ -5,7 +5,10 @@ import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
 
-import { NatGatewayState } from '../states/nat-gateway.state';
+import {
+  NatGatewayRouteState,
+  NatGatewayState,
+} from '../states/nat-gateway.state';
 
 export type RemoveNatGatewaysState = NatGatewayState[];
 
@@ -14,6 +17,8 @@ export class RemoveNatGatewaysTrick
   private ec2Client: AWS.EC2;
 
   static machineName = 'remove-nat-gateways';
+
+  private routeTablesCache?: AWS.EC2.RouteTableList;
 
   constructor() {
     this.ec2Client = new AWS.EC2();
@@ -39,7 +44,7 @@ export class RemoveNatGatewaysTrick
     const natGateways = await this.listNatGateways(task);
 
     const subListr = new Listr({
-      concurrent: true,
+      concurrent: false,
       exitOnError: false,
       collapse: false,
     } as ListrOptions);
@@ -49,11 +54,12 @@ export class RemoveNatGatewaysTrick
         (natGateway): ListrTask => {
           return {
             title: natGateway.NatGatewayId || chalk.italic('<no-id>'),
-            task: async () => {
+            task: async (ctx, task) => {
               if (
                 !natGateway.NatGatewayId ||
                 !natGateway.VpcId ||
-                !natGateway.SubnetId
+                !natGateway.SubnetId ||
+                !natGateway.State
               ) {
                 throw new Error(
                   `Unexpected values on Nat Gateway: ${JSON.stringify(
@@ -62,10 +68,15 @@ export class RemoveNatGatewaysTrick
                 );
               }
 
+              task.output = 'Finding routes...';
+              const routes = await this.findRoutes(natGateway);
+
               currentState.push({
                 id: natGateway.NatGatewayId,
                 vpcId: natGateway.VpcId,
                 subnetId: natGateway.SubnetId,
+                state: natGateway.State,
+                routes,
                 allocationIds:
                   natGateway.NatGatewayAddresses?.map(
                     a => a.AllocationId || '',
@@ -130,6 +141,13 @@ export class RemoveNatGatewaysTrick
     natGateway: NatGatewayState,
     options: TrickOptionsInterface,
   ): Promise<void> {
+    if (natGateway.state !== 'available') {
+      task.skip(
+        `Skipped, state is not "available", it is "${natGateway.state}" instead`,
+      );
+      return;
+    }
+
     if (options.dryRun) {
       task.skip(`Skipped, would remove NAT Gateway`);
       return;
@@ -153,6 +171,13 @@ export class RemoveNatGatewaysTrick
     const allocationId =
       natGateway.allocationIds && natGateway.allocationIds[0];
 
+    if (natGateway.state !== 'available') {
+      task.skip(
+        `Skipped, state was not "available", it was "${natGateway.state}" instead`,
+      );
+      return;
+    }
+
     if (options.dryRun) {
       task.skip(
         `Skipped, would create NAT Gateway on subnet = ${natGateway.subnetId} and allocate EIP = ${allocationId}`,
@@ -173,13 +198,31 @@ export class RemoveNatGatewaysTrick
         ],
       })
       .promise();
+    const newNatGatewayId = result.NatGateway?.NatGatewayId as string;
 
     task.output = 'Waiting for NAT Gateway to be available...';
     await this.ec2Client
       .waitFor('natGatewayAvailable', {
-        NatGatewayIds: [result.NatGateway?.NatGatewayId || ''],
+        NatGatewayIds: [newNatGatewayId],
       })
       .promise();
+
+    for (const route of natGateway.routes) {
+      task.output = `Adding NAT gateway to original route tables (${route.destinationCidr ||
+        route.destinationIpv6Cidr ||
+        route.destinationPrefixListId})...`;
+      await this.ec2Client
+        .replaceRoute({
+          RouteTableId: route.routeTableId,
+          NatGatewayId: newNatGatewayId,
+          ...(route.destinationCidr
+            ? { DestinationCidrBlock: route.destinationCidr }
+            : route.destinationIpv6Cidr
+            ? { DestinationIpv6CidrBlock: route.destinationIpv6Cidr }
+            : { DestinationPrefixListId: route.destinationPrefixListId }),
+        })
+        .promise();
+    }
 
     task.output = 'NAT Gateway Created';
   }
@@ -202,8 +245,41 @@ export class RemoveNatGatewaysTrick
 
   private static getNameTag(natGateway: NatGatewayState) {
     return natGateway.tags
-      .filter(t => t.Key?.toString().toLowerCase() === 'name')
+      .filter(t => (t.Key as string).toString().toLowerCase() === 'name')
       .map(t => t.Value)
       .join(' ');
+  }
+
+  private async findRoutes(natGateway: AWS.EC2.NatGateway) {
+    const routes: NatGatewayRouteState[] = [];
+    const routeTables = await this.getAllRouteTables();
+
+    routeTables?.forEach(rt => {
+      if (rt.Routes && rt.Routes.length > 0) {
+        for (const route of rt.Routes) {
+          if (route.NatGatewayId === natGateway.NatGatewayId) {
+            routes.push({
+              routeTableId: rt.RouteTableId as string,
+              destinationCidr: route.DestinationCidrBlock,
+              destinationIpv6Cidr: route.DestinationCidrBlock,
+              destinationPrefixListId: route.DestinationPrefixListId,
+            });
+          }
+        }
+      }
+    });
+
+    return routes;
+  }
+
+  private async getAllRouteTables() {
+    if (!this.routeTablesCache) {
+      // TODO Handle pagination
+      const result = await this.ec2Client.describeRouteTables({}).promise();
+
+      this.routeTablesCache = result.RouteTables;
+    }
+
+    return this.routeTablesCache;
   }
 }

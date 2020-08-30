@@ -158,7 +158,7 @@ describe('stop-fargate-ecs-services', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-
+    listr.setRenderer('silent');
     await expect(async () => listr.run()).rejects.toThrow();
 
     AWSMock.restore('ECS');
