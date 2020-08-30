@@ -1,14 +1,15 @@
-import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
-import { Command, flags } from '@oclif/command';
-import Listr, { ListrTask } from 'listr';
+import { flags } from '@oclif/command';
+import Listr, { ListrOptions, ListrTask } from 'listr';
 
+import BaseCommand from '../base-command';
 import { TrickRegistry } from '../tricks/trick-registry';
 import { configureAWS } from '../configure-aws';
 import { RootState } from '../interfaces/root-state';
+import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
 
-export default class Restore extends Command {
+export default class Restore extends BaseCommand {
   static description =
     'To restore AWS resources stopped by the conserve command.';
 
@@ -52,6 +53,9 @@ export default class Restore extends Command {
     const stateContent = readFileSync(flags['state-file'], 'utf-8');
     const rootState: RootState = JSON.parse(stateContent.toString());
     const taskList: ListrTask[] = [];
+    const options: TrickOptionsInterface = {
+      dryRun: flags['dry-run'],
+    };
 
     for (const trick of tricksRegistry.all()) {
       taskList.push({
@@ -62,21 +66,20 @@ export default class Restore extends Command {
           }
 
           return trick
-            .restore(task, rootState[trick.getMachineName()], flags['dry-run'])
+            .restore(task, rootState[trick.getMachineName()], options)
             .catch(task.report);
         },
         exitOnError: false,
-        // @ts-ignore
         collapse: false,
       } as ListrTask);
     }
 
     await new Listr<RootState>(taskList, {
+      renderer: process.env.NODE_ENV === 'test' ? 'silent' : 'default',
       concurrent: true,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    })
+    } as ListrOptions)
       .run()
       .then(() => {
         if (flags['dry-run']) {
@@ -98,24 +101,5 @@ export default class Restore extends Command {
           )}.`,
         );
       });
-  }
-
-  private printBanner(awsConfig: AWS.Config, flags: Record<string, any>) {
-    const awsRegion = awsConfig.region || flags.region;
-    const awsProfile = (awsConfig.credentials as any).profile || flags.profile;
-
-    this.log(`
-AWS Cost Saver
---------------
-  Action: ${chalk.green('restore')}
-  AWS region: ${chalk.green(awsRegion)}
-  AWS profile: ${chalk.green(awsProfile)}
-  State file: ${
-    flags['no-state-file']
-      ? chalk.yellow('none')
-      : chalk.green(flags['state-file'])
-  }
-  Dry run: ${flags['dry-run'] ? chalk.green('yes') : chalk.yellow('no')}
-`);
   }
 }

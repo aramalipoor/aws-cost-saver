@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -38,24 +38,23 @@ export class DecreaseKinesisStreamsShardsTrick
   ): Promise<Listr> {
     const streamNames = await this.listKinesisStreamsNames(task);
 
-    if (!streamNames || streamNames.length === 0) {
-      task.skip('No Kinesis Streams found');
-      return;
-    }
-
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!streamNames || streamNames.length === 0) {
+      task.skip('No Kinesis Streams found');
+      return subListr;
+    }
 
     subListr.add(
       streamNames.map(
         (streamName): ListrTask => {
-          const streamState: KinesisStreamState = {
+          const streamState = {
             name: streamName,
-          };
+          } as KinesisStreamState;
           currentState.push(streamState);
           return {
             title: streamName,
@@ -76,9 +75,8 @@ export class DecreaseKinesisStreamsShardsTrick
     const subListr = new Listr({
       concurrent: 5,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const stream of currentState) {
@@ -102,9 +100,8 @@ export class DecreaseKinesisStreamsShardsTrick
     const subListr = new Listr({
       concurrent: 5,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (originalState && originalState.length > 0) {
       for (const table of originalState) {
@@ -128,8 +125,8 @@ export class DecreaseKinesisStreamsShardsTrick
     // TODO Add logic to go through all pages
     task.output = 'Fetching page 1...';
     streamNames.push(
-      ...((await this.ksClient.listStreams({ Limit: 100 }).promise())
-        .StreamNames || []),
+      ...(await this.ksClient.listStreams({ Limit: 100 }).promise())
+        .StreamNames,
     );
 
     return streamNames;
@@ -198,18 +195,13 @@ export class DecreaseKinesisStreamsShardsTrick
     streamState: KinesisStreamState,
     options: TrickOptionsInterface,
   ): Promise<void> {
-    if (streamState.shards < 2) {
-      task.skip(`Shards were already at minimum of 1`);
+    if (streamState.state !== 'ACTIVE') {
+      task.skip(`State was not Active, it was ${streamState.state} instead.`);
       return;
     }
 
-    const streamSummary = await this.getStreamSummary(streamState.name);
-    const currentShards = streamSummary.OpenShardCount;
-
-    if (currentShards >= streamState.shards) {
-      task.skip(
-        `Stream shards are already configured to ${currentShards}. Previous number of shards: ${streamState.shards}`,
-      );
+    if (streamState.shards < 2) {
+      task.skip(`Shards were already at minimum of 1`);
       return;
     }
 
@@ -221,6 +213,16 @@ export class DecreaseKinesisStreamsShardsTrick
     if (options.dryRun) {
       task.skip(
         `Skipped, would increase number of shards to ${streamState.shards}`,
+      );
+      return;
+    }
+
+    const streamSummary = await this.getStreamSummary(streamState.name);
+    const currentShards = streamSummary.OpenShardCount;
+
+    if (currentShards >= streamState.shards) {
+      task.skip(
+        `Stream shards are already configured to ${currentShards}. Previous number of shards: ${streamState.shards}`,
       );
       return;
     }

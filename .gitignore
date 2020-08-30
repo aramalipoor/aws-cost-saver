@@ -1,7 +1,8 @@
 *-debug.log
 *-error.log
-lib
+dist
 coverage
 node_modules
 oclif.manifest.json
 *.tgz
+*.tsbuildinfo

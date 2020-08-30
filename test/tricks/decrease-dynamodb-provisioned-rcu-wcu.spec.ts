@@ -2,7 +2,6 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 
 import { ListrTaskWrapper } from 'listr';
-import SilentRenderer from 'listr-silent-renderer';
 
 import {
   DecreaseDynamoDBProvisionedRcuWcuTrick,
@@ -14,7 +13,7 @@ beforeAll(async done => {
   done();
 });
 
-describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
+describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
   let task: ListrTaskWrapper;
 
   beforeEach(() => {
@@ -120,7 +119,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
       dryRun: false,
     });
 
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
@@ -166,7 +165,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
       dryRun: false,
     });
 
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
@@ -180,34 +179,6 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
   it('conserves provisioned RCU and WCU', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    AWSMock.mock(
-      'DynamoDB',
-      'listTables',
-      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
-        callback(null, { TableNames: ['foo'] });
-      },
-    );
-
-    AWSMock.mock(
-      'DynamoDB',
-      'describeTable',
-      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
-        if (params.TableName === 'foo') {
-          callback(null, {
-            Table: {
-              TableName: 'foo',
-              ProvisionedThroughput: {
-                WriteCapacityUnits: 15,
-                ReadCapacityUnits: 17,
-              },
-            },
-          } as AWS.DynamoDB.Types.DescribeTableOutput);
-        } else {
-          callback(new Error('Table not exists'));
-        }
-      },
-    );
-
     const updateTableSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
@@ -216,17 +187,18 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
 
     const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
-    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
-    const stateListr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
-    stateListr.setRenderer(SilentRenderer);
-    await stateListr.run({});
-
+    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [
+      {
+        name: 'foo',
+        provisionedThroughput: true,
+        wcu: 22,
+        rcu: 33,
+      },
+    ];
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).toBeCalledWith(
@@ -276,7 +248,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -307,7 +279,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -338,7 +310,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -368,7 +340,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).toBeCalledWith(
@@ -418,7 +390,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -449,7 +421,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).toBeCalledWith(
@@ -484,7 +456,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -515,7 +487,7 @@ describe('DecreaseDynamoDBProvisionedRcuWcuTrick', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();

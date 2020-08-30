@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -34,45 +34,46 @@ export class SnapshotRemoveElasticacheRedisTrick
   async getCurrentState(
     task: ListrTaskWrapper,
     currentState: SnapshotRemoveElasticacheRedisState,
+    options: TrickOptionsInterface,
   ): Promise<Listr> {
     const replicationGroups = await this.listReplicationGroups(task);
-
-    if (!replicationGroups || replicationGroups.length === 0) {
-      task.skip('No ElastiCache Redis clusters found');
-      return;
-    }
 
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!replicationGroups || replicationGroups.length === 0) {
+      task.skip('No ElastiCache Redis clusters found');
+      return subListr;
+    }
 
     subListr.add(
       replicationGroups.map(
         (replicationGroup): ListrTask => {
-          if (replicationGroup.ReplicationGroupId === undefined) {
-            throw new Error(
-              `Unexpected error: ReplicationGroupId is missing for ElastiCache replication group`,
-            );
-          }
-
-          const replicationGroupState: ElasticacheReplicationGroupState = {
-            id: replicationGroup.ReplicationGroupId,
-            status: replicationGroup.Status,
-          };
-
-          currentState.push(replicationGroupState);
-
           return {
-            title: replicationGroup.ReplicationGroupId,
-            task: async (ctx, task) =>
-              this.getReplicationGroupState(
+            title:
+              replicationGroup.ReplicationGroupId || chalk.italic('<no-id>'),
+            task: async (ctx, task) => {
+              if (replicationGroup.ReplicationGroupId === undefined) {
+                throw new Error(
+                  `Unexpected error: ReplicationGroupId is missing for ElastiCache replication group`,
+                );
+              }
+
+              const replicationGroupState = {
+                id: replicationGroup.ReplicationGroupId,
+              } as ElasticacheReplicationGroupState;
+
+              currentState.push(replicationGroupState);
+
+              return this.getReplicationGroupState(
                 task,
                 replicationGroupState,
                 replicationGroup,
-              ),
+              );
+            },
           };
         },
       ),
@@ -89,9 +90,8 @@ export class SnapshotRemoveElasticacheRedisTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const replicationGroup of currentState) {
@@ -116,9 +116,8 @@ export class SnapshotRemoveElasticacheRedisTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (originalState && originalState.length > 0) {
       for (const replicationGroup of originalState) {
@@ -195,7 +194,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       return;
     }
 
-    if (await this.isReplicationGroupAvailable(replicationGroupState)) {
+    if (await this.doesReplicationGroupExist(replicationGroupState)) {
       task.skip('ElastiCache redis cluster already exists');
       return;
     }
@@ -238,15 +237,11 @@ export class SnapshotRemoveElasticacheRedisTrick
     replicationGroupState: ElasticacheReplicationGroupState,
     replicationGroup: AWS.ElastiCache.ReplicationGroup,
   ): Promise<void> {
+    replicationGroupState.status = 'unknown';
+
     if (replicationGroup.ARN === undefined) {
       throw new Error(
         `Unexpected error: ARN is missing for ElastiCache replication group`,
-      );
-    }
-
-    if (replicationGroup.ReplicationGroupId === undefined) {
-      throw new Error(
-        `Unexpected error: ReplicationGroupId is missing for ElastiCache replication group`,
       );
     }
 
@@ -277,7 +272,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     );
 
     if (!sampleCacheCluster) {
-      throw new Error(`Could not find snapshotting cache cluster`);
+      throw new Error(`Could not find sample cache cluster`);
     }
 
     task.output = 'Preparing re-create params...';
@@ -316,7 +311,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     snapshotName: string,
     replicationGroup: AWS.ElastiCache.ReplicationGroup,
     nodeGroups: AWS.ElastiCache.NodeGroupConfiguration[],
-    snapshottingCacheCluster: AWS.ElastiCache.CacheCluster,
+    sampleCacheCluster: AWS.ElastiCache.CacheCluster,
   ): Promise<AWS.ElastiCache.CreateReplicationGroupMessage> {
     return {
       // Required
@@ -345,46 +340,44 @@ export class SnapshotRemoveElasticacheRedisTrick
         replicationGroup.AutomaticFailover !== undefined &&
         ['enabled', 'enabling'].includes(replicationGroup.AutomaticFailover),
       Port:
-        (snapshottingCacheCluster.CacheNodes &&
-          snapshottingCacheCluster.CacheNodes[0]?.Endpoint?.Port) ||
+        (sampleCacheCluster.CacheNodes &&
+          sampleCacheCluster.CacheNodes[0]?.Endpoint?.Port) ||
         (replicationGroup.NodeGroups &&
           replicationGroup.NodeGroups[0]?.PrimaryEndpoint?.Port),
-      Tags: await this.getTags(snapshottingCacheCluster.ARN || ''),
+      Tags: await this.getTags(sampleCacheCluster.ARN as string),
 
       // Cache Clusters Configs
       PreferredCacheClusterAZs:
         nodeGroups.length > 1
           ? undefined
-          : snapshottingCacheCluster.PreferredAvailabilityZone
-          ? [snapshottingCacheCluster.PreferredAvailabilityZone]
+          : sampleCacheCluster.PreferredAvailabilityZone
+          ? [sampleCacheCluster.PreferredAvailabilityZone]
           : undefined,
       SecurityGroupIds:
-        snapshottingCacheCluster.SecurityGroups?.map(
-          s => s.SecurityGroupId || '',
-        ) || [],
+        sampleCacheCluster.SecurityGroups?.map(s => s.SecurityGroupId || '') ||
+        [],
       CacheSecurityGroupNames:
-        snapshottingCacheCluster.CacheSecurityGroups?.map(
+        sampleCacheCluster.CacheSecurityGroups?.map(
           c => c.CacheSecurityGroupName || '',
         ) || [],
 
       // Shared Cache Cluster Configs
-      AutoMinorVersionUpgrade: snapshottingCacheCluster.AutoMinorVersionUpgrade,
-      CacheNodeType: snapshottingCacheCluster.CacheNodeType,
-      SnapshotRetentionLimit: snapshottingCacheCluster.SnapshotRetentionLimit,
-      Engine: snapshottingCacheCluster.Engine,
-      EngineVersion: snapshottingCacheCluster.EngineVersion,
+      AutoMinorVersionUpgrade: sampleCacheCluster.AutoMinorVersionUpgrade,
+      CacheNodeType: sampleCacheCluster.CacheNodeType,
+      SnapshotRetentionLimit: sampleCacheCluster.SnapshotRetentionLimit,
+      Engine: sampleCacheCluster.Engine,
+      EngineVersion: sampleCacheCluster.EngineVersion,
       CacheParameterGroupName:
-        snapshottingCacheCluster.CacheParameterGroup?.CacheParameterGroupName,
-      CacheSubnetGroupName: snapshottingCacheCluster.CacheSubnetGroupName,
+        sampleCacheCluster.CacheParameterGroup?.CacheParameterGroupName,
+      CacheSubnetGroupName: sampleCacheCluster.CacheSubnetGroupName,
       NotificationTopicArn:
-        snapshottingCacheCluster.NotificationConfiguration?.TopicArn,
-      SnapshotWindow: snapshottingCacheCluster.SnapshotWindow,
-      PreferredMaintenanceWindow:
-        snapshottingCacheCluster.PreferredMaintenanceWindow,
+        sampleCacheCluster.NotificationConfiguration?.TopicArn,
+      SnapshotWindow: sampleCacheCluster.SnapshotWindow,
+      PreferredMaintenanceWindow: sampleCacheCluster.PreferredMaintenanceWindow,
     } as AWS.ElastiCache.CreateReplicationGroupMessage;
   }
 
-  private async isReplicationGroupAvailable(
+  private async doesReplicationGroupExist(
     replicationGroupState: ElasticacheReplicationGroupState,
   ) {
     const result = await this.elcClient
@@ -410,7 +403,7 @@ export class SnapshotRemoveElasticacheRedisTrick
         await this.elcClient
           .describeReplicationGroups({ MaxRecords: 100 })
           .promise()
-      ).ReplicationGroups || []),
+      ).ReplicationGroups as AWS.ElastiCache.ReplicationGroupList),
     );
 
     return replicationGroups;
@@ -419,28 +412,24 @@ export class SnapshotRemoveElasticacheRedisTrick
   private async describeCacheCluster(
     cacheClusterId: string,
   ): Promise<AWS.ElastiCache.CacheCluster | undefined> {
-    return (
-      (
-        await this.elcClient
-          .describeCacheClusters({
-            CacheClusterId: cacheClusterId,
-            ShowCacheNodeInfo: true,
-          })
-          .promise()
-      ).CacheClusters || []
-    ).pop();
+    return ((
+      await this.elcClient
+        .describeCacheClusters({
+          CacheClusterId: cacheClusterId,
+          ShowCacheNodeInfo: true,
+        })
+        .promise()
+    ).CacheClusters as AWS.ElastiCache.CacheClusterList).pop();
   }
 
   private async getTags(arn: string) {
     return (
-      (
-        await this.elcClient
-          .listTagsForResource({
-            ResourceName: arn,
-          })
-          .promise()
-      ).TagList || []
-    );
+      await this.elcClient
+        .listTagsForResource({
+          ResourceName: arn,
+        })
+        .promise()
+    ).TagList as AWS.ElastiCache.TagList;
   }
 
   private static generateSnapshotName(

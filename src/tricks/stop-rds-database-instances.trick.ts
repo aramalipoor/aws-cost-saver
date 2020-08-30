@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -38,17 +38,16 @@ export class StopRdsDatabaseInstancesTrick
   ): Promise<Listr> {
     const databases = await this.listDatabases(task);
 
-    if (!databases || databases.length === 0) {
-      task.skip('No RDS databases found');
-      return;
-    }
-
     const subListr = new Listr({
       concurrent: true,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!databases || databases.length === 0) {
+      task.skip('No RDS databases found');
+      return subListr;
+    }
 
     subListr.add(
       databases.map(
@@ -90,16 +89,14 @@ export class StopRdsDatabaseInstancesTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const database of currentState) {
         subListr.add({
           title: chalk.blueBright(`${database.identifier}`),
-          task: (ctx, task) =>
-            this.conserveDatabase(task, database, options.dryRun),
+          task: (ctx, task) => this.conserveDatabase(task, database, options),
         });
       }
     } else {
@@ -117,16 +114,14 @@ export class StopRdsDatabaseInstancesTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (originalState && originalState.length > 0) {
       for (const database of originalState) {
         subListr.add({
           title: chalk.blueBright(`${database.identifier}`),
-          task: (ctx, task) =>
-            this.restoreDatabase(task, database, options.dryRun),
+          task: (ctx, task) => this.restoreDatabase(task, database, options),
         });
       }
     } else {
@@ -199,6 +194,7 @@ export class StopRdsDatabaseInstancesTrick
     } catch (error) {
       if (error.code === 'InvalidDBInstanceState') {
         task.skip('Skipped, database is not in "stopped" state.');
+        return;
       }
 
       throw error;

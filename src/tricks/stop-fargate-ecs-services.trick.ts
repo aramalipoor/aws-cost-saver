@@ -1,7 +1,7 @@
 import _ from 'lodash';
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -43,17 +43,16 @@ export class StopFargateEcsServicesTrick
   ): Promise<Listr> {
     const clustersArn = await this.listClusters(task);
 
-    if (!clustersArn || clustersArn.length === 0) {
-      task.skip('No clusters found');
-      return;
-    }
-
     const subListr = new Listr({
       concurrent: 3,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!clustersArn || clustersArn.length === 0) {
+      task.skip('No clusters found');
+      return subListr;
+    }
 
     subListr.add(
       clustersArn.map(
@@ -82,9 +81,8 @@ export class StopFargateEcsServicesTrick
     const subListr = new Listr({
       concurrent: 3,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     for (const cluster of currentState) {
       for (const service of cluster.services) {
@@ -117,9 +115,8 @@ export class StopFargateEcsServicesTrick
               {
                 exitOnError: false,
                 concurrent: true,
-                // @ts-ignore
                 collapse: false,
-              },
+              } as ListrOptions,
             ),
         });
       }
@@ -136,9 +133,8 @@ export class StopFargateEcsServicesTrick
     const subListr = new Listr({
       concurrent: 3,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     for (const cluster of originalState) {
       for (const service of cluster.services) {
@@ -171,9 +167,8 @@ export class StopFargateEcsServicesTrick
               {
                 exitOnError: false,
                 concurrent: true,
-                // @ts-ignore
                 collapse: false,
-              },
+              } as ListrOptions,
             ),
         });
       }
@@ -196,9 +191,8 @@ export class StopFargateEcsServicesTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     subListr.add(
       services.map(
@@ -211,7 +205,7 @@ export class StopFargateEcsServicesTrick
 
           const serviceState: EcsServiceState = {
             arn: service.serviceArn,
-            desired: service.desiredCount || 0,
+            desired: service.desiredCount as number,
             scalableTargets: [],
           };
 

@@ -1,10 +1,9 @@
-import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import inquirer from 'inquirer';
-import { writeFileSync, existsSync } from 'fs';
-import Command, { flags } from '@oclif/command';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import { writeFileSync } from 'fs';
+import { flags } from '@oclif/command';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 
+import BaseCommand from '../base-command';
 import { configureAWS } from '../configure-aws';
 import { TrickRegistry } from '../tricks/trick-registry';
 import { TrickInterface } from '../interfaces/trick.interface';
@@ -20,7 +19,7 @@ import { DecreaseKinesisStreamsShardsTrick } from '../tricks/decrease-kinesis-st
 import { RootState } from '../interfaces/root-state';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
 
-export default class Conserve extends Command {
+export default class Conserve extends BaseCommand {
   static tricksEnabledByDefault: readonly string[] = [
     ShutdownEC2InstancesTrick.machineName,
     StopFargateEcsServicesTrick.machineName,
@@ -140,11 +139,11 @@ export default class Conserve extends Command {
     }
 
     await new Listr<RootState>(rootTaskList, {
+      renderer: process.env.NODE_ENV === 'test' ? 'silent' : 'default',
       concurrent: true,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    })
+    } as ListrOptions)
       .run(rootState)
       .finally(() => {
         if (!flags['no-state-file']) {
@@ -169,11 +168,6 @@ export default class Conserve extends Command {
       })
       .catch(error => {
         if (error.errors.length < rootTaskList.length) {
-          writeFileSync(
-            flags['state-file'],
-            JSON.stringify(rootState, null, 2),
-            'utf-8',
-          );
           this.log(
             `\n${chalk.yellow('✔')} Partially conserved, with ${chalk.red(
               `${error.errors.length} error(s)`,
@@ -216,9 +210,8 @@ export default class Conserve extends Command {
       {
         concurrent: false,
         exitOnError: true,
-        // @ts-ignore
         collapse: false,
-      },
+      } as ListrOptions,
     );
   }
 
@@ -235,8 +228,8 @@ export default class Conserve extends Command {
     }
 
     if (flags['ignore-trick'] && flags['ignore-trick'].length > 0) {
-      enabledTricks = enabledTricks.filter(disabledTrickName =>
-        flags['ignore-trick'].includes(disabledTrickName),
+      enabledTricks = enabledTricks.filter(
+        trickName => !flags['ignore-trick'].includes(trickName),
       );
     }
 
@@ -255,56 +248,5 @@ export default class Conserve extends Command {
 
       return trick;
     });
-  }
-
-  private printBanner(awsConfig: AWS.Config, flags: Record<string, any>) {
-    const awsRegion = awsConfig.region || flags.region;
-    const awsProfile = (awsConfig.credentials as any).profile || flags.profile;
-
-    this.log(`
-AWS Cost Saver
---------------
-  Action: ${chalk.green('conserve')}
-  AWS region: ${chalk.green(awsRegion)}
-  AWS profile: ${chalk.green(awsProfile)}
-  State file: ${
-    flags['no-state-file']
-      ? chalk.yellow('none')
-      : chalk.green(flags['state-file'])
-  }
-  Dry run: ${flags['dry-run'] ? chalk.green('yes') : chalk.yellow('no')}
-`);
-  }
-
-  private async validateStateFilePath(flags: Record<string, any>) {
-    if (!flags['no-state-file'] && existsSync(flags['state-file'])) {
-      this.log(
-        chalk.yellow(
-          `\n→ State file already exists: ${chalk.yellowBright(
-            flags['state-file'],
-          )}\n`,
-        ),
-      );
-      const answers = await inquirer.prompt([
-        {
-          name: 'stateFileOverwrite',
-          type: 'confirm',
-          default: false,
-          message: `Are you sure you want to ${chalk.bgRed(
-            chalk.white('OVERWRITE'),
-          )} existing state-file?\n  You will not be able to restore to previously conserved resources!`,
-        },
-      ]);
-
-      if (!answers.stateFileOverwrite) {
-        this.log(
-          chalk.redBright(
-            '\nIgnoring, to avoid overwriting state file! Use -n|--no-state-file flag to skip writing the state file.\n',
-          ),
-        );
-
-        throw new Error('AbortedByUser');
-      }
-    }
   }
 }

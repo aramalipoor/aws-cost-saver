@@ -1,5 +1,5 @@
 import AWS from 'aws-sdk';
-import Listr, { ListrTask, ListrTaskWrapper } from 'listr';
+import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
 
 import { TrickInterface } from '../interfaces/trick.interface';
@@ -38,17 +38,16 @@ export class ShutdownEC2InstancesTrick
   ): Promise<Listr> {
     const reservations = await this.listReservations(task);
 
-    if (!reservations || reservations.length === 0) {
-      task.skip('No EC2 instances found');
-      return;
-    }
-
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
+
+    if (!reservations || reservations.length === 0) {
+      task.skip('No EC2 instances found');
+      return subListr;
+    }
 
     for (const reservation of reservations) {
       subListr.add(
@@ -69,7 +68,8 @@ export class ShutdownEC2InstancesTrick
 
                 const nameTag = instance.Tags
                   ? instance.Tags.filter(
-                      t => t.Key?.toString().toLowerCase() === 'name',
+                      t =>
+                        (t.Key as string).toString().toLowerCase() === 'name',
                     )
                       .map(t => t.Value)
                       .join(' ')
@@ -100,9 +100,8 @@ export class ShutdownEC2InstancesTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (currentState && currentState.length > 0) {
       for (const instance of currentState) {
@@ -126,9 +125,8 @@ export class ShutdownEC2InstancesTrick
     const subListr = new Listr({
       concurrent: 10,
       exitOnError: false,
-      // @ts-ignore
       collapse: false,
-    });
+    } as ListrOptions);
 
     if (originalState && originalState.length > 0) {
       for (const instance of originalState) {
