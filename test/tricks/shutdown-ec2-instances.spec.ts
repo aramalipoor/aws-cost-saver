@@ -2,7 +2,6 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 
 import { ListrTaskWrapper } from 'listr';
-import SilentRenderer from 'listr-silent-renderer';
 
 import {
   ShutdownEC2InstancesTrick,
@@ -131,7 +130,7 @@ describe('shutdown-ec2-instances', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
 
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
@@ -162,7 +161,7 @@ describe('shutdown-ec2-instances', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
 
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
@@ -195,7 +194,7 @@ describe('shutdown-ec2-instances', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
 
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
@@ -248,7 +247,7 @@ describe('shutdown-ec2-instances', () => {
       dryRun: false,
     });
 
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject).toMatchObject([
@@ -298,7 +297,7 @@ describe('shutdown-ec2-instances', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(stopInstancesSpy).toBeCalledWith(
@@ -337,7 +336,7 @@ describe('shutdown-ec2-instances', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(stopInstancesSpy).not.toBeCalled();
@@ -390,7 +389,7 @@ describe('shutdown-ec2-instances', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(stopInstancesSpy).not.toBeCalled();
@@ -419,7 +418,7 @@ describe('shutdown-ec2-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startInstancesSpy).toBeCalledWith(
@@ -464,7 +463,7 @@ describe('shutdown-ec2-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startInstancesSpy).not.toBeCalled();
@@ -494,7 +493,7 @@ describe('shutdown-ec2-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startInstancesSpy).not.toBeCalled();

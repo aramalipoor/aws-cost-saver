@@ -2,7 +2,6 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 
 import { ListrTaskWrapper } from 'listr';
-import SilentRenderer from 'listr-silent-renderer';
 
 import {
   StopRdsDatabaseInstancesTrick,
@@ -117,7 +116,7 @@ describe('stop-rds-database-instances', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
 
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
@@ -151,7 +150,7 @@ describe('stop-rds-database-instances', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
 
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
@@ -188,7 +187,7 @@ describe('stop-rds-database-instances', () => {
       dryRun: false,
     });
 
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
@@ -223,7 +222,7 @@ describe('stop-rds-database-instances', () => {
       dryRun: false,
     });
 
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
@@ -254,7 +253,7 @@ describe('stop-rds-database-instances', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(stopDBInstanceSpy).toBeCalledWith(
@@ -298,7 +297,7 @@ describe('stop-rds-database-instances', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(stopDBInstanceSpy).not.toBeCalled();
@@ -327,7 +326,7 @@ describe('stop-rds-database-instances', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(stopDBInstanceSpy).not.toBeCalled();
@@ -355,7 +354,7 @@ describe('stop-rds-database-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startDBInstanceSpy).toBeCalledWith(
@@ -399,7 +398,7 @@ describe('stop-rds-database-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startDBInstanceSpy).not.toBeCalled();
@@ -428,7 +427,7 @@ describe('stop-rds-database-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startDBInstanceSpy).toBeCalled();
@@ -457,7 +456,7 @@ describe('stop-rds-database-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
 
     await expect(async () => restoreListr.run()).rejects.toThrow();
 
@@ -484,7 +483,7 @@ describe('stop-rds-database-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startDBInstanceSpy).not.toBeCalled();
@@ -513,7 +512,7 @@ describe('stop-rds-database-instances', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(startDBInstanceSpy).not.toBeCalled();

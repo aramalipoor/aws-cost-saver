@@ -2,7 +2,6 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 
 import { ListrTaskWrapper } from 'listr';
-import SilentRenderer from 'listr-silent-renderer';
 
 import {
   DecreaseDynamoDBProvisionedRcuWcuTrick,
@@ -120,7 +119,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
       dryRun: false,
     });
 
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
@@ -166,7 +165,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
       dryRun: false,
     });
 
-    listr.setRenderer(SilentRenderer);
+    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
@@ -199,7 +198,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).toBeCalledWith(
@@ -249,7 +248,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -280,7 +279,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -311,7 +310,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer(SilentRenderer);
+    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -341,7 +340,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).toBeCalledWith(
@@ -391,7 +390,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -422,7 +421,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).toBeCalledWith(
@@ -457,7 +456,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
@@ -488,7 +487,7 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer(SilentRenderer);
+    restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
     expect(updateTableSpy).not.toBeCalled();
