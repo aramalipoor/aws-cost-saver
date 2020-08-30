@@ -1,7 +1,7 @@
 {
   "name": "aws-cost-saver",
   "description": "A tiny CLI tool to help save costs in development environments when you're asleep and don't need them!",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "author": "aramalipoor",
   "bin": {
     "aws-cost-saver": "./bin/run"
@@ -73,7 +73,6 @@
   },
   "repository": "aramalipoor/aws-cost-saver",
   "scripts": {
-    "postpack": "rm -f oclif.manifest.json",
     "posttest": "eslint . --ext .ts --config .eslintrc",
     "prepack": "rm -rf dist && tsc --build tsconfig.json && oclif-dev manifest",
     "test": "jest --coverage --runInBand"
