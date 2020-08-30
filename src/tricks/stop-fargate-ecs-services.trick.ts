@@ -252,7 +252,7 @@ export class StopFargateEcsServicesTrick
     task.output = 'Fetching page 1...';
     clustersArn.push(
       ...((await this.ecsClient.listClusters({ maxResults: 100 }).promise())
-        .clusterArns || []),
+        .clusterArns as AWS.ECS.StringList),
     );
 
     return clustersArn;
@@ -272,7 +272,7 @@ export class StopFargateEcsServicesTrick
             maxResults: 100,
           })
           .promise()
-      ).serviceArns || []),
+      ).serviceArns as AWS.ECS.StringList),
     );
 
     return servicesArn;
