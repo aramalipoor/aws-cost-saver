@@ -353,11 +353,9 @@ describe('remove-nat-gateways', () => {
         } as AWS.EC2.CreateNatGatewayResult);
       });
     AWSMock.mock('EC2', 'createNatGateway', createNatGatewaySpy);
-    const replaceRouteSpy = jest
-      .fn()
-      .mockImplementationOnce((params, callback) => {
-        callback(null, {});
-      });
+    const replaceRouteSpy = jest.fn().mockImplementation((params, callback) => {
+      callback(null, {});
+    });
     AWSMock.mock('EC2', 'replaceRoute', replaceRouteSpy);
 
     const instance = new RemoveNatGatewaysTrick();
@@ -368,7 +366,11 @@ describe('remove-nat-gateways', () => {
         subnetId: 'baz',
         allocationIds: ['qux'],
         state: 'available',
-        routes: [{ routeTableId: 'quux', destinationCidr: '1.2.0.0/0' }],
+        routes: [
+          { routeTableId: 'quux', destinationCidr: '1.2.0.0/0' },
+          { routeTableId: 'cypo', destinationIpv6Cidr: '2001:db8::/32' },
+          { routeTableId: 'lopr', destinationPrefixListId: 'some-id' },
+        ],
         tags: [{ Key: 'Team', Value: 'Tacos' }],
       },
     ];
@@ -396,6 +398,22 @@ describe('remove-nat-gateways', () => {
         RouteTableId: 'quux',
         NatGatewayId: 'newfoo',
         DestinationCidrBlock: '1.2.0.0/0',
+      }),
+      expect.anything(),
+    );
+    expect(replaceRouteSpy).toBeCalledWith(
+      expect.objectContaining({
+        RouteTableId: 'cypo',
+        NatGatewayId: 'newfoo',
+        DestinationIpv6CidrBlock: '2001:db8::/32',
+      }),
+      expect.anything(),
+    );
+    expect(replaceRouteSpy).toBeCalledWith(
+      expect.objectContaining({
+        RouteTableId: 'lopr',
+        NatGatewayId: 'newfoo',
+        DestinationPrefixListId: 'some-id',
       }),
       expect.anything(),
     );
