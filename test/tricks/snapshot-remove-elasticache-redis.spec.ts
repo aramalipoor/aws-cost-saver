@@ -386,6 +386,455 @@ describe('snapshot-remove-elasticache-redis', () => {
     AWSMock.restore('ElastiCache');
   });
 
+  it('generates state object for ElastiCache redis clusters without PreferredAvailabilityZone', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeReplicationGroups',
+      (
+        params: AWS.ElastiCache.Types.DescribeReplicationGroupsMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ReplicationGroups: [
+            {
+              ReplicationGroupId: 'foo',
+              Status: 'available',
+              ARN: 'arn:elasticachecluster/foo',
+              MemberClusters: ['bar'],
+              AtRestEncryptionEnabled: true,
+              TransitEncryptionEnabled: true,
+              MultiAZ: 'enabled',
+              Description: 'something',
+              KmsKeyId: 'secret-key-id',
+              AutomaticFailover: 'enabled',
+              NodeGroups: [{ NodeGroupId: 'qux', Slots: '0-50000' }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.ReplicationGroupMessage);
+      },
+    );
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeCacheClusters',
+      (
+        params: AWS.ElastiCache.Types.DescribeCacheClustersMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          CacheClusters: [
+            {
+              AutoMinorVersionUpgrade: true,
+              CacheNodeType: 'cache.t2.small',
+              SnapshotRetentionLimit: 10,
+              Engine: 'redis',
+              EngineVersion: '5.0.6',
+              CacheParameterGroup: { CacheParameterGroupName: 'baz' },
+              CacheSubnetGroupName: 'qux',
+              CacheSecurityGroups: [{ CacheSecurityGroupName: 'quuz' }],
+              SecurityGroups: [{ SecurityGroupId: 'my-sec' }],
+              NotificationConfiguration: { TopicArn: 'arn:topic/quux' },
+              SnapshotWindow: '05:00-09:00',
+              PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+              // PreferredAvailabilityZone: 'eu-central-1c',
+              CacheNodes: [{ Endpoint: { Port: 3333 } }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.CacheClusterMessage);
+      },
+    );
+
+    const instance = new SnapshotRemoveElasticacheRedisTrick();
+    const stateObject: SnapshotRemoveElasticacheRedisState = [];
+    const listr = await instance.getCurrentState(task, stateObject, {
+      dryRun: false,
+    });
+
+    listr.setRenderer('silent');
+    await listr.run({});
+
+    expect(stateObject.pop()).toStrictEqual(
+      expect.objectContaining({
+        id: 'foo',
+        snapshotName: expect.any(String),
+        status: 'available',
+        createParams: {
+          AtRestEncryptionEnabled: true,
+          AutoMinorVersionUpgrade: true,
+          AutomaticFailoverEnabled: true,
+          CacheNodeType: 'cache.t2.small',
+          CacheParameterGroupName: 'baz',
+          CacheSecurityGroupNames: ['quuz'],
+          CacheSubnetGroupName: 'qux',
+          Engine: 'redis',
+          EngineVersion: '5.0.6',
+          // GlobalReplicationGroupId: undefined,
+          KmsKeyId: 'secret-key-id',
+          MultiAZEnabled: true,
+          // NodeGroupConfiguration: undefined,
+          NotificationTopicArn: 'arn:topic/quux',
+          NumCacheClusters: 1,
+          // NumNodeGroups: undefined,
+          Port: 3333,
+          // PreferredCacheClusterAZs: ['eu-central-1c'],
+          PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+          ReplicationGroupDescription: 'something',
+          ReplicationGroupId: 'foo',
+          SecurityGroupIds: ['my-sec'],
+          SnapshotName: expect.any(String),
+          SnapshotRetentionLimit: 10,
+          SnapshotWindow: '05:00-09:00',
+          Tags: [{ Key: 'Name', Value: 'my-cluster' }],
+          TransitEncryptionEnabled: true,
+        },
+      } as ElasticacheReplicationGroupState),
+    );
+
+    AWSMock.restore('ElastiCache');
+  });
+
+  it('generates state object for ElastiCache redis clusters without description', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeReplicationGroups',
+      (
+        params: AWS.ElastiCache.Types.DescribeReplicationGroupsMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ReplicationGroups: [
+            {
+              ReplicationGroupId: 'foo',
+              Status: 'available',
+              ARN: 'arn:elasticachecluster/foo',
+              MemberClusters: ['bar'],
+              AtRestEncryptionEnabled: true,
+              TransitEncryptionEnabled: true,
+              MultiAZ: 'enabled',
+              KmsKeyId: 'secret-key-id',
+              AutomaticFailover: 'enabled',
+              NodeGroups: [{ NodeGroupId: 'qux', Slots: '0-50000' }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.ReplicationGroupMessage);
+      },
+    );
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeCacheClusters',
+      (
+        params: AWS.ElastiCache.Types.DescribeCacheClustersMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          CacheClusters: [
+            {
+              AutoMinorVersionUpgrade: true,
+              CacheNodeType: 'cache.t2.small',
+              SnapshotRetentionLimit: 10,
+              Engine: 'redis',
+              EngineVersion: '5.0.6',
+              CacheParameterGroup: { CacheParameterGroupName: 'baz' },
+              CacheSubnetGroupName: 'qux',
+              CacheSecurityGroups: [{ CacheSecurityGroupName: 'quuz' }],
+              SecurityGroups: [{ SecurityGroupId: 'my-sec' }],
+              NotificationConfiguration: { TopicArn: 'arn:topic/quux' },
+              SnapshotWindow: '05:00-09:00',
+              PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+              PreferredAvailabilityZone: 'eu-central-1c',
+              CacheNodes: [{ Endpoint: { Port: 3333 } }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.CacheClusterMessage);
+      },
+    );
+
+    const instance = new SnapshotRemoveElasticacheRedisTrick();
+    const stateObject: SnapshotRemoveElasticacheRedisState = [];
+    const listr = await instance.getCurrentState(task, stateObject, {
+      dryRun: false,
+    });
+
+    listr.setRenderer('silent');
+    await listr.run({});
+
+    expect(stateObject.pop()).toStrictEqual(
+      expect.objectContaining({
+        id: 'foo',
+        snapshotName: expect.any(String),
+        status: 'available',
+        createParams: {
+          AtRestEncryptionEnabled: true,
+          AutoMinorVersionUpgrade: true,
+          AutomaticFailoverEnabled: true,
+          CacheNodeType: 'cache.t2.small',
+          CacheParameterGroupName: 'baz',
+          CacheSecurityGroupNames: ['quuz'],
+          CacheSubnetGroupName: 'qux',
+          Engine: 'redis',
+          EngineVersion: '5.0.6',
+          // GlobalReplicationGroupId: undefined,
+          KmsKeyId: 'secret-key-id',
+          MultiAZEnabled: true,
+          // NodeGroupConfiguration: undefined,
+          NotificationTopicArn: 'arn:topic/quux',
+          NumCacheClusters: 1,
+          // NumNodeGroups: undefined,
+          Port: 3333,
+          PreferredCacheClusterAZs: ['eu-central-1c'],
+          PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+          ReplicationGroupDescription: expect.any(String),
+          ReplicationGroupId: 'foo',
+          SecurityGroupIds: ['my-sec'],
+          SnapshotName: expect.any(String),
+          SnapshotRetentionLimit: 10,
+          SnapshotWindow: '05:00-09:00',
+          Tags: [{ Key: 'Name', Value: 'my-cluster' }],
+          TransitEncryptionEnabled: true,
+        },
+      } as ElasticacheReplicationGroupState),
+    );
+
+    AWSMock.restore('ElastiCache');
+  });
+
+  it('generates state object for ElastiCache redis clusters with multiple NodeGroups', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeReplicationGroups',
+      (
+        params: AWS.ElastiCache.Types.DescribeReplicationGroupsMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ReplicationGroups: [
+            {
+              ReplicationGroupId: 'foo',
+              Status: 'available',
+              ARN: 'arn:elasticachecluster/foo',
+              MemberClusters: ['bar'],
+              AtRestEncryptionEnabled: true,
+              TransitEncryptionEnabled: true,
+              MultiAZ: 'enabled',
+              Description: 'something',
+              KmsKeyId: 'secret-key-id',
+              AutomaticFailover: 'enabled',
+              NodeGroups: [
+                { NodeGroupId: 'qux', Slots: '0-1000' },
+                { NodeGroupId: 'quuz', Slots: '1000-50000' },
+              ],
+            },
+          ],
+        } as AWS.ElastiCache.Types.ReplicationGroupMessage);
+      },
+    );
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeCacheClusters',
+      (
+        params: AWS.ElastiCache.Types.DescribeCacheClustersMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          CacheClusters: [
+            {
+              AutoMinorVersionUpgrade: true,
+              CacheNodeType: 'cache.t2.small',
+              SnapshotRetentionLimit: 10,
+              Engine: 'redis',
+              EngineVersion: '5.0.6',
+              CacheParameterGroup: { CacheParameterGroupName: 'baz' },
+              CacheSubnetGroupName: 'qux',
+              CacheSecurityGroups: [{ CacheSecurityGroupName: 'quuz' }],
+              SecurityGroups: [{ SecurityGroupId: 'my-sec' }],
+              NotificationConfiguration: { TopicArn: 'arn:topic/quux' },
+              SnapshotWindow: '05:00-09:00',
+              PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+              PreferredAvailabilityZone: 'eu-central-1c',
+              CacheNodes: [{ Endpoint: { Port: 3333 } }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.CacheClusterMessage);
+      },
+    );
+
+    const instance = new SnapshotRemoveElasticacheRedisTrick();
+    const stateObject: SnapshotRemoveElasticacheRedisState = [];
+    const listr = await instance.getCurrentState(task, stateObject, {
+      dryRun: false,
+    });
+
+    listr.setRenderer('silent');
+    await listr.run({});
+
+    expect(stateObject).toStrictEqual([
+      {
+        id: 'foo',
+        snapshotName: expect.any(String),
+        status: 'available',
+        createParams: {
+          AtRestEncryptionEnabled: true,
+          AutoMinorVersionUpgrade: true,
+          AutomaticFailoverEnabled: true,
+          CacheNodeType: 'cache.t2.small',
+          CacheParameterGroupName: 'baz',
+          CacheSecurityGroupNames: ['quuz'],
+          CacheSubnetGroupName: 'qux',
+          Engine: 'redis',
+          EngineVersion: '5.0.6',
+          GlobalReplicationGroupId: undefined,
+          KmsKeyId: 'secret-key-id',
+          MultiAZEnabled: true,
+          NodeGroupConfiguration: [
+            {
+              NodeGroupId: 'qux',
+              ReplicaCount: undefined,
+              Slots: '0-1000',
+            },
+            {
+              NodeGroupId: 'quuz',
+              ReplicaCount: undefined,
+              Slots: '1000-50000',
+            },
+          ],
+          NotificationTopicArn: 'arn:topic/quux',
+          NumCacheClusters: undefined,
+          NumNodeGroups: 2,
+          Port: 3333,
+          PreferredCacheClusterAZs: undefined,
+          PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+          ReplicationGroupDescription: 'something',
+          ReplicationGroupId: 'foo',
+          SecurityGroupIds: ['my-sec'],
+          SnapshotName: expect.any(String),
+          SnapshotRetentionLimit: 10,
+          SnapshotWindow: '05:00-09:00',
+          Tags: [{ Key: 'Name', Value: 'my-cluster' }],
+          TransitEncryptionEnabled: true,
+        },
+      } as ElasticacheReplicationGroupState,
+    ]);
+
+    AWSMock.restore('ElastiCache');
+  });
+
+  it('generates state object for ElastiCache redis clusters without NodeGroups', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeReplicationGroups',
+      (
+        params: AWS.ElastiCache.Types.DescribeReplicationGroupsMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ReplicationGroups: [
+            {
+              ReplicationGroupId: 'foo',
+              Status: 'available',
+              ARN: 'arn:elasticachecluster/foo',
+              MemberClusters: ['bar'],
+              AtRestEncryptionEnabled: true,
+              TransitEncryptionEnabled: true,
+              MultiAZ: 'enabled',
+              Description: 'something',
+              KmsKeyId: 'secret-key-id',
+              AutomaticFailover: 'enabled',
+              NodeGroups: undefined,
+            },
+          ],
+        } as AWS.ElastiCache.Types.ReplicationGroupMessage);
+      },
+    );
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeCacheClusters',
+      (
+        params: AWS.ElastiCache.Types.DescribeCacheClustersMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          CacheClusters: [
+            {
+              AutoMinorVersionUpgrade: true,
+              CacheNodeType: 'cache.t2.small',
+              SnapshotRetentionLimit: 10,
+              Engine: 'redis',
+              EngineVersion: '5.0.6',
+              CacheParameterGroup: { CacheParameterGroupName: 'baz' },
+              CacheSubnetGroupName: 'qux',
+              CacheSecurityGroups: [{ CacheSecurityGroupName: 'quuz' }],
+              SecurityGroups: [{ SecurityGroupId: 'my-sec' }],
+              NotificationConfiguration: { TopicArn: 'arn:topic/quux' },
+              SnapshotWindow: '05:00-09:00',
+              PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+              PreferredAvailabilityZone: 'eu-central-1c',
+              CacheNodes: [{ Endpoint: { Port: 3333 } }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.CacheClusterMessage);
+      },
+    );
+
+    const instance = new SnapshotRemoveElasticacheRedisTrick();
+    const stateObject: SnapshotRemoveElasticacheRedisState = [];
+    const listr = await instance.getCurrentState(task, stateObject, {
+      dryRun: false,
+    });
+
+    listr.setRenderer('silent');
+    await listr.run({});
+
+    expect(stateObject).toStrictEqual([
+      {
+        id: 'foo',
+        snapshotName: expect.any(String),
+        status: 'available',
+        createParams: {
+          AtRestEncryptionEnabled: true,
+          AutoMinorVersionUpgrade: true,
+          AutomaticFailoverEnabled: true,
+          CacheNodeType: 'cache.t2.small',
+          CacheParameterGroupName: 'baz',
+          CacheSecurityGroupNames: ['quuz'],
+          CacheSubnetGroupName: 'qux',
+          Engine: 'redis',
+          EngineVersion: '5.0.6',
+          GlobalReplicationGroupId: undefined,
+          KmsKeyId: 'secret-key-id',
+          MultiAZEnabled: true,
+          NodeGroupConfiguration: undefined,
+          NotificationTopicArn: 'arn:topic/quux',
+          NumCacheClusters: 1,
+          NumNodeGroups: undefined,
+          Port: 3333,
+          PreferredCacheClusterAZs: ['eu-central-1c'],
+          PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+          ReplicationGroupDescription: 'something',
+          ReplicationGroupId: 'foo',
+          SecurityGroupIds: ['my-sec'],
+          SnapshotName: expect.any(String),
+          SnapshotRetentionLimit: 10,
+          SnapshotWindow: '05:00-09:00',
+          Tags: [{ Key: 'Name', Value: 'my-cluster' }],
+          TransitEncryptionEnabled: true,
+        },
+      } as ElasticacheReplicationGroupState,
+    ]);
+
+    AWSMock.restore('ElastiCache');
+  });
+
   it('conserves ElastiCache redis cluster', async () => {
     AWSMock.setSDKInstance(AWS);
 
@@ -718,8 +1167,6 @@ describe('snapshot-remove-elasticache-redis', () => {
   });
 
   it('errors on restore if required fields are missing in state', async () => {
-    AWSMock.setSDKInstance(AWS);
-
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject = ([
       {
@@ -747,7 +1194,5 @@ describe('snapshot-remove-elasticache-redis', () => {
         }),
       ]),
     });
-
-    AWSMock.restore('ElastiCache');
   });
 });

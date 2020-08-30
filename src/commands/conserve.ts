@@ -15,6 +15,7 @@ import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../tricks/decrease-dynam
 import { RemoveNatGatewaysTrick } from '../tricks/remove-nat-gateways.trick';
 import { SnapshotRemoveElasticacheRedisTrick } from '../tricks/snapshot-remove-elasticache-redis.trick';
 import { DecreaseKinesisStreamsShardsTrick } from '../tricks/decrease-kinesis-streams-shards.trick';
+import { StopRdsDatabaseClustersTrick } from '../tricks/stop-rds-database-clusters.trick';
 
 import { RootState } from '../interfaces/root-state';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -26,6 +27,7 @@ export default class Conserve extends BaseCommand {
     StopRdsDatabaseInstancesTrick.machineName,
     DecreaseDynamoDBProvisionedRcuWcuTrick.machineName,
     DecreaseKinesisStreamsShardsTrick.machineName,
+    StopRdsDatabaseClustersTrick.machineName,
   ];
 
   static tricksDisabledByDefault: readonly string[] = [

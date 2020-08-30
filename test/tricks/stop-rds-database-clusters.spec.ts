@@ -4,10 +4,10 @@ import AWSMock from 'aws-sdk-mock';
 import { ListrTaskWrapper } from 'listr';
 
 import {
-  StopRdsDatabaseInstancesTrick,
-  StopRdsDatabaseInstancesState,
-} from '../../src/tricks/stop-rds-database-instances.trick';
-import { RdsDatabaseState } from '../../src/states/rds-database.state';
+  StopRdsDatabaseClustersTrick,
+  StopRdsDatabaseClustersState,
+} from '../../src/tricks/stop-rds-database-clusters.trick';
+import { RdsClusterState } from '../../src/states/rds-cluster.state';
 
 beforeAll(async done => {
   // AWSMock cannot mock waiters at the moment
@@ -18,7 +18,7 @@ beforeAll(async done => {
   done();
 });
 
-describe('stop-rds-database-instances', () => {
+describe('stop-rds-database-clusters', () => {
   let task: ListrTaskWrapper;
 
   beforeEach(() => {
@@ -32,14 +32,14 @@ describe('stop-rds-database-instances', () => {
   });
 
   it('returns correct machine name', async () => {
-    const instance = new StopRdsDatabaseInstancesTrick();
+    const instance = new StopRdsDatabaseClustersTrick();
     expect(instance.getMachineName()).toBe(
-      StopRdsDatabaseInstancesTrick.machineName,
+      StopRdsDatabaseClustersTrick.machineName,
     );
   });
 
   it('returns different title for conserve and restore commands', async () => {
-    const instance = new StopRdsDatabaseInstancesTrick();
+    const instance = new StopRdsDatabaseClustersTrick();
     expect(instance.getConserveTitle()).not.toBe(instance.getRestoreTitle());
   });
 
@@ -48,19 +48,16 @@ describe('stop-rds-database-instances', () => {
 
     AWSMock.mock(
       'RDS',
-      'describeDBInstances',
-      (
-        params: AWS.RDS.Types.DescribeDBInstancesMessage,
-        callback: Function,
-      ) => {
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBInstances: [],
-        } as AWS.RDS.Types.DBInstanceMessage);
+          DBClusters: [],
+        } as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
@@ -70,22 +67,19 @@ describe('stop-rds-database-instances', () => {
     AWSMock.restore('RDS');
   });
 
-  it('returns an empty Listr if DBInstances was not returned by AWS', async () => {
+  it('returns an empty Listr if DBClusters was not returned by AWS', async () => {
     AWSMock.setSDKInstance(AWS);
 
     AWSMock.mock(
       'RDS',
-      'describeDBInstances',
-      (
-        params: AWS.RDS.Types.DescribeDBInstancesMessage,
-        callback: Function,
-      ) => {
-        callback(null, {} as AWS.RDS.Types.DBInstanceMessage);
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
+        callback(null, {} as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
@@ -95,24 +89,21 @@ describe('stop-rds-database-instances', () => {
     AWSMock.restore('RDS');
   });
 
-  it('errors if DBInstanceIdentifier was not returned by AWS', async () => {
+  it('errors if DBClusterIdentifier was not returned by AWS', async () => {
     AWSMock.setSDKInstance(AWS);
 
     AWSMock.mock(
       'RDS',
-      'describeDBInstances',
-      (
-        params: AWS.RDS.Types.DescribeDBInstancesMessage,
-        callback: Function,
-      ) => {
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBInstances: [{ DBInstanceStatus: 'available' }],
-        } as AWS.RDS.Types.DBInstanceMessage);
+          DBClusters: [{ Status: 'available' }],
+        } as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
@@ -121,7 +112,7 @@ describe('stop-rds-database-instances', () => {
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
         expect.objectContaining({
-          message: expect.stringContaining('DBInstanceIdentifier is missing'),
+          message: expect.stringContaining('DBClusterIdentifier is missing'),
         }),
       ]),
     });
@@ -129,24 +120,21 @@ describe('stop-rds-database-instances', () => {
     AWSMock.restore('RDS');
   });
 
-  it('errors if DBInstanceStatus was not returned by AWS', async () => {
+  it('errors if Status was not returned by AWS', async () => {
     AWSMock.setSDKInstance(AWS);
 
     AWSMock.mock(
       'RDS',
-      'describeDBInstances',
-      (
-        params: AWS.RDS.Types.DescribeDBInstancesMessage,
-        callback: Function,
-      ) => {
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBInstances: [{ DBInstanceIdentifier: 'foo' }],
-        } as AWS.RDS.Types.DBInstanceMessage);
+          DBClusters: [{ DBClusterIdentifier: 'foo' }],
+        } as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
@@ -155,7 +143,7 @@ describe('stop-rds-database-instances', () => {
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
         expect.objectContaining({
-          message: expect.stringContaining('DBInstanceStatus is missing'),
+          message: expect.stringContaining('Status is missing'),
         }),
       ]),
     });
@@ -163,26 +151,21 @@ describe('stop-rds-database-instances', () => {
     AWSMock.restore('RDS');
   });
 
-  it('generates state object for available RDS instances', async () => {
+  it('generates state object for available RDS clusters', async () => {
     AWSMock.setSDKInstance(AWS);
 
     AWSMock.mock(
       'RDS',
-      'describeDBInstances',
-      (
-        params: AWS.RDS.Types.DescribeDBInstancesMessage,
-        callback: Function,
-      ) => {
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBInstances: [
-            { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'available' },
-          ],
-        } as AWS.RDS.Types.DBInstanceMessage);
+          DBClusters: [{ DBClusterIdentifier: 'foo', Status: 'available' }],
+        } as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
@@ -195,52 +178,7 @@ describe('stop-rds-database-instances', () => {
         {
           identifier: 'foo',
           status: 'available',
-        } as RdsDatabaseState,
-      ]),
-    );
-
-    AWSMock.restore('RDS');
-  });
-
-  it('generates state object without instances that belong to a cluster', async () => {
-    AWSMock.setSDKInstance(AWS);
-
-    AWSMock.mock(
-      'RDS',
-      'describeDBInstances',
-      (
-        params: AWS.RDS.Types.DescribeDBInstancesMessage,
-        callback: Function,
-      ) => {
-        callback(null, {
-          DBInstances: [
-            { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'available' },
-            {
-              DBInstanceIdentifier: 'zoo',
-              DBInstanceStatus: 'available',
-              DBClusterIdentifier: 'qux',
-            },
-          ],
-        } as AWS.RDS.Types.DBInstanceMessage);
-      },
-    );
-
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
-
-    listr.setRenderer('silent');
-    await listr.run({});
-
-    expect(stateObject.length).toBe(1);
-    expect(stateObject).toStrictEqual(
-      expect.objectContaining([
-        {
-          identifier: 'foo',
-          status: 'available',
-        } as RdsDatabaseState,
+        } as RdsClusterState,
       ]),
     );
 
@@ -252,21 +190,16 @@ describe('stop-rds-database-instances', () => {
 
     AWSMock.mock(
       'RDS',
-      'describeDBInstances',
-      (
-        params: AWS.RDS.Types.DescribeDBInstancesMessage,
-        callback: Function,
-      ) => {
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBInstances: [
-            { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'stopped' },
-          ],
-        } as AWS.RDS.Types.DBInstanceMessage);
+          DBClusters: [{ DBClusterIdentifier: 'foo', Status: 'stopped' }],
+        } as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
@@ -277,23 +210,23 @@ describe('stop-rds-database-instances', () => {
     expect(stateObject.pop()).toMatchObject({
       identifier: 'foo',
       status: 'stopped',
-    } as RdsDatabaseState);
+    } as RdsClusterState);
 
     AWSMock.restore('RDS');
   });
 
-  it('conserves available RDS database instances', async () => {
+  it('conserves available RDS database clusters', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const stopDBInstanceSpy = jest
+    const stopDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock('RDS', 'stopDBInstance', stopDBInstanceSpy);
+    AWSMock.mock('RDS', 'stopDBCluster', stopDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'available',
@@ -305,9 +238,9 @@ describe('stop-rds-database-instances', () => {
     conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
-    expect(stopDBInstanceSpy).toBeCalledWith(
+    expect(stopDBClusterSpy).toBeCalledWith(
       expect.objectContaining({
-        DBInstanceIdentifier: 'foo',
+        DBClusterIdentifier: 'foo',
       }),
       expect.anything(),
     );
@@ -316,8 +249,8 @@ describe('stop-rds-database-instances', () => {
   });
 
   it('skips conserve if no databases are found', async () => {
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
 
     await instance.conserve(task, stateObject, {
       dryRun: false,
@@ -328,15 +261,15 @@ describe('stop-rds-database-instances', () => {
   it('skips conserve for database if status is not available', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const stopDBInstanceSpy = jest
+    const stopDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock('RDS', 'stopDBInstance', stopDBInstanceSpy);
+    AWSMock.mock('RDS', 'stopDBCluster', stopDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'stopped',
@@ -349,7 +282,7 @@ describe('stop-rds-database-instances', () => {
     conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
-    expect(stopDBInstanceSpy).not.toBeCalled();
+    expect(stopDBClusterSpy).not.toBeCalled();
 
     AWSMock.restore('RDS');
   });
@@ -357,15 +290,15 @@ describe('stop-rds-database-instances', () => {
   it('skips conserve for database if dry-run option is enabled', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const stopDBInstanceSpy = jest
+    const stopDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock('RDS', 'stopDBInstance', stopDBInstanceSpy);
+    AWSMock.mock('RDS', 'stopDBCluster', stopDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'available',
@@ -378,7 +311,7 @@ describe('stop-rds-database-instances', () => {
     conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
-    expect(stopDBInstanceSpy).not.toBeCalled();
+    expect(stopDBClusterSpy).not.toBeCalled();
 
     AWSMock.restore('RDS');
   });
@@ -386,15 +319,15 @@ describe('stop-rds-database-instances', () => {
   it('restores stopped RDS database instance', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const startDBInstanceSpy = jest
+    const startDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);
+    AWSMock.mock('RDS', 'startDBCluster', startDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'available',
@@ -406,9 +339,9 @@ describe('stop-rds-database-instances', () => {
     restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
-    expect(startDBInstanceSpy).toBeCalledWith(
+    expect(startDBClusterSpy).toBeCalledWith(
       expect.objectContaining({
-        DBInstanceIdentifier: 'foo',
+        DBClusterIdentifier: 'foo',
       }),
       expect.anything(),
     );
@@ -417,8 +350,8 @@ describe('stop-rds-database-instances', () => {
   });
 
   it('skips restore if no databases were conserved', async () => {
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [];
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
 
     await instance.restore(task, stateObject, {
       dryRun: false,
@@ -429,15 +362,15 @@ describe('stop-rds-database-instances', () => {
   it('skips restore for database if status was not "available"', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const startDBInstanceSpy = jest
+    const startDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);
+    AWSMock.mock('RDS', 'startDBCluster', startDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'stopped',
@@ -450,7 +383,7 @@ describe('stop-rds-database-instances', () => {
     restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
-    expect(startDBInstanceSpy).not.toBeCalled();
+    expect(startDBClusterSpy).not.toBeCalled();
 
     AWSMock.restore('RDS');
   });
@@ -458,15 +391,15 @@ describe('stop-rds-database-instances', () => {
   it('skips restore for database if actual current status was not available', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const startDBInstanceSpy = jest
+    const startDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback({ code: 'InvalidDBInstanceState' }, null);
       });
-    AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);
+    AWSMock.mock('RDS', 'startDBCluster', startDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'available',
@@ -479,7 +412,7 @@ describe('stop-rds-database-instances', () => {
     restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
-    expect(startDBInstanceSpy).toBeCalled();
+    expect(startDBClusterSpy).toBeCalled();
 
     AWSMock.restore('RDS');
   });
@@ -487,15 +420,15 @@ describe('stop-rds-database-instances', () => {
   it('errors when restoring database if AWS command fails', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const startDBInstanceSpy = jest
+    const startDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback({ code: 'SomethingBad' }, null);
       });
-    AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);
+    AWSMock.mock('RDS', 'startDBCluster', startDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'available',
@@ -509,7 +442,7 @@ describe('stop-rds-database-instances', () => {
 
     await expect(async () => restoreListr.run()).rejects.toThrow();
 
-    expect(startDBInstanceSpy).toBeCalled();
+    expect(startDBClusterSpy).toBeCalled();
 
     AWSMock.restore('RDS');
   });
@@ -517,17 +450,17 @@ describe('stop-rds-database-instances', () => {
   it('skips restore for database if status is not provided in state', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const startDBInstanceSpy = jest
+    const startDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);
+    AWSMock.mock('RDS', 'startDBCluster', startDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
+    const instance = new StopRdsDatabaseClustersTrick();
     const stateObject = JSON.parse(
       `[{"name": "foo"}]`,
-    ) as StopRdsDatabaseInstancesState;
+    ) as StopRdsDatabaseClustersState;
 
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
@@ -535,7 +468,7 @@ describe('stop-rds-database-instances', () => {
     restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
-    expect(startDBInstanceSpy).not.toBeCalled();
+    expect(startDBClusterSpy).not.toBeCalled();
 
     AWSMock.restore('RDS');
   });
@@ -543,15 +476,15 @@ describe('stop-rds-database-instances', () => {
   it('skips restore for database if dry-run option is enabled', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const startDBInstanceSpy = jest
+    const startDBClusterSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);
+    AWSMock.mock('RDS', 'startDBCluster', startDBClusterSpy);
 
-    const instance = new StopRdsDatabaseInstancesTrick();
-    const stateObject: StopRdsDatabaseInstancesState = [
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [
       {
         identifier: 'foo',
         status: 'available',
@@ -564,7 +497,7 @@ describe('stop-rds-database-instances', () => {
     restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
-    expect(startDBInstanceSpy).not.toBeCalled();
+    expect(startDBClusterSpy).not.toBeCalled();
 
     AWSMock.restore('RDS');
   });

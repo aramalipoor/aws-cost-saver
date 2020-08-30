@@ -14,6 +14,7 @@ A tiny CLI tool to help save costs in development environments when you're aslee
   5. [remove-nat-gateways](#-remove-nat-gateways)
   6. [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
   7. [decrease-kinesis-streams-shards](#-decrease-kinesis-streams-shards)
+  8. [stop-rds-database-clusters](#-stop-rds-database-clusters)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -111,6 +112,9 @@ $ aws-cost-saver conserve --use-trick snapshot-remove-elasticache-redis
 
 ### # decrease-kinesis-streams-shards
 Kinesis Stream Shards cost hourly. This trick will decrease open shards to the minimum of 1, in multiple steps by [halving number of shards](https://docs.aws.amazon.com/kinesis/latest/APIReference/API_UpdateShardCount.html#Streams-UpdateShardCount-request-TargetShardCount) in each step. Currently this trick is useful when you're doing `UNIFORM_SCALING`, i.e. default config of Kinesis Stream. 
+
+### # stop-rds-database-clusters
+Stopping RDS clusters will save underlying EC2 instance costs. This trick will keep track of stopped clusters in the state-file and start them again on restore.
 
 ### # TODO
 If you know any other tricks to save some money feel free to create a Pull Request or raise an issue.
