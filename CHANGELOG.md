@@ -1,4 +1,4 @@
-## [v0.0.9](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.0.9) (XXXX-XX-XX)
+## [v0.0.9](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.0.9) (2020-08-30)
 * Add scaledown-auto-scaling-groups trick ([#23](https://github.com/aramalipoor/aws-cost-saver/pull/23))
 * Add stop-rds-database-clusters trick ([#22](https://github.com/aramalipoor/aws-cost-saver/pull/22))
 * Restore NAT Gateway routes on restore command ([#20](https://github.com/aramalipoor/aws-cost-saver/pull/20))
