@@ -101,6 +101,13 @@ describe('remove-nat-gateways', () => {
               NatGatewayAddresses: [{ AllocationId: 'qux' }],
               Tags: [{ Key: 'Team', Value: 'Tacos' }],
             },
+            {
+              NatGatewayId: 'foo',
+              VpcId: 'bar',
+              SubnetId: 'baz',
+              // NatGatewayAddresses: [{ AllocationId: 'qux' }],
+              Tags: [{ Key: 'Team', Value: 'Tacos' }],
+            },
           ],
         } as AWS.EC2.Types.DescribeNatGatewaysResult);
       },
@@ -115,6 +122,9 @@ describe('remove-nat-gateways', () => {
 
     await expect(async () => listr.run()).rejects.toMatchObject({
       errors: expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringMatching(/unexpected values/gi),
+        }),
         expect.objectContaining({
           message: expect.stringMatching(/unexpected values/gi),
         }),
@@ -175,6 +185,24 @@ describe('remove-nat-gateways', () => {
                 { DestinationCidrBlock: '2.2.0.0/0', NatGatewayId: 'foo' },
               ],
             },
+            {
+              RouteTableId: 'cypo',
+              Routes: [
+                {
+                  DestinationIpv6CidrBlock: '2001:db8::/32',
+                  NatGatewayId: 'foo',
+                },
+              ],
+            },
+            {
+              RouteTableId: 'lopr',
+              Routes: [
+                {
+                  DestinationPrefixListId: 'some-id',
+                  NatGatewayId: 'foo',
+                },
+              ],
+            },
           ],
         } as AWS.EC2.Types.DescribeRouteTablesResult);
       },
@@ -195,7 +223,11 @@ describe('remove-nat-gateways', () => {
       subnetId: 'baz',
       allocationIds: ['qux'],
       state: 'available',
-      routes: [{ routeTableId: 'quux', destinationCidr: '2.2.0.0/0' }],
+      routes: [
+        { routeTableId: 'quux', destinationCidr: '2.2.0.0/0' },
+        { routeTableId: 'cypo', destinationIpv6Cidr: '2001:db8::/32' },
+        { routeTableId: 'lopr', destinationPrefixListId: 'some-id' },
+      ],
       tags: [{ Key: 'Team', Value: 'Tacos' }],
     } as NatGatewayState);
 
