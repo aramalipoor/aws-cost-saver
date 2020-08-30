@@ -15,6 +15,7 @@ A tiny CLI tool to help save costs in development environments when you're aslee
   6. [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
   7. [decrease-kinesis-streams-shards](#-decrease-kinesis-streams-shards)
   8. [stop-rds-database-clusters](#-stop-rds-database-clusters)
+  9. [scaledown-auto-scaling-groups](#-scaledown-auto-scaling-groups)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -115,6 +116,9 @@ Kinesis Stream Shards cost hourly. This trick will decrease open shards to the m
 
 ### # stop-rds-database-clusters
 Stopping RDS clusters will save underlying EC2 instance costs. This trick will keep track of stopped clusters in the state-file and start them again on restore.
+
+### # scaledown-auto-scaling-groups
+When Auto Scaling Groups are configured they might launch EC2 instances. This trick will set "desired", "min" and "max" capacity of ASGs to zero and keep track of original values in the state-file.
 
 ### # TODO
 If you know any other tricks to save some money feel free to create a Pull Request or raise an issue.
