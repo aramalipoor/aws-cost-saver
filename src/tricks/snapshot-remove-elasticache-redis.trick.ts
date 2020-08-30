@@ -340,10 +340,8 @@ export class SnapshotRemoveElasticacheRedisTrick
         replicationGroup.AutomaticFailover !== undefined &&
         ['enabled', 'enabling'].includes(replicationGroup.AutomaticFailover),
       Port:
-        (sampleCacheCluster.CacheNodes &&
-          sampleCacheCluster.CacheNodes[0]?.Endpoint?.Port) ||
-        (replicationGroup.NodeGroups &&
-          replicationGroup.NodeGroups[0]?.PrimaryEndpoint?.Port),
+        sampleCacheCluster.CacheNodes &&
+        sampleCacheCluster.CacheNodes[0]?.Endpoint?.Port,
       Tags: await this.getTags(sampleCacheCluster.ARN as string),
 
       // Cache Clusters Configs
