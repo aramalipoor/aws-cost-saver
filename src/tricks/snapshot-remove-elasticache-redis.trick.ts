@@ -353,13 +353,12 @@ export class SnapshotRemoveElasticacheRedisTrick
           : sampleCacheCluster.PreferredAvailabilityZone
           ? [sampleCacheCluster.PreferredAvailabilityZone]
           : undefined,
-      SecurityGroupIds:
-        sampleCacheCluster.SecurityGroups?.map(s => s.SecurityGroupId || '') ||
-        [],
-      CacheSecurityGroupNames:
-        sampleCacheCluster.CacheSecurityGroups?.map(
-          c => c.CacheSecurityGroupName || '',
-        ) || [],
+      SecurityGroupIds: sampleCacheCluster.SecurityGroups?.map(
+        s => s.SecurityGroupId as string,
+      ),
+      CacheSecurityGroupNames: sampleCacheCluster.CacheSecurityGroups?.map(
+        c => c.CacheSecurityGroupName || '',
+      ),
 
       // Shared Cache Cluster Configs
       AutoMinorVersionUpgrade: sampleCacheCluster.AutoMinorVersionUpgrade,
