@@ -146,7 +146,7 @@ export default class Conserve extends BaseCommand {
       renderer: process.env.NODE_ENV === 'test' ? 'silent' : 'default',
       concurrent: true,
       exitOnError: false,
-      collapse: false,
+      collapse: true,
     } as ListrOptions)
       .run(rootState)
       .finally(() => {

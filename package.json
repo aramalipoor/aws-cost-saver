@@ -44,6 +44,9 @@
     "ts-node": "^8.10.2",
     "typescript": "^3.9.7"
   },
+  "resolutions": {
+    "**/log-update": "^4.0.0"
+  },
   "engines": {
     "node": ">=8.0.0"
   },

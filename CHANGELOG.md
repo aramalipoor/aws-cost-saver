@@ -9,7 +9,7 @@
 * Add decrease-kinesis-streams-shards trick ([#13](https://github.com/aramalipoor/aws-cost-saver/pull/13))
 
 ## [v0.0.7](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.0.7) (2020-08-23)
-* Fix tcs, npm pack and publish issues
+* Fix tsc, npm pack and publish issues
 
 ## [v0.0.6](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.0.6) (2020-08-23)
 * Add snapshot-and-remove-elasti-cache-clusters trick ([#12](https://github.com/aramalipoor/aws-cost-saver/pull/12))
