@@ -5,38 +5,38 @@ import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
 
-import { RdsDatabaseState } from '../states/rds-database.state';
+import { RdsClusterState } from '../states/rds-cluster.state';
 
-export type StopRdsDatabaseInstancesState = RdsDatabaseState[];
+export type StopRdsDatabaseClustersState = RdsClusterState[];
 
-export class StopRdsDatabaseInstancesTrick
-  implements TrickInterface<StopRdsDatabaseInstancesState> {
+export class StopRdsDatabaseClustersTrick
+  implements TrickInterface<StopRdsDatabaseClustersState> {
   private rdsClient: AWS.RDS;
 
-  static machineName = 'stop-rds-database-instances';
+  static machineName = 'stop-rds-database-clusters';
 
   constructor() {
     this.rdsClient = new AWS.RDS();
   }
 
   getMachineName(): string {
-    return StopRdsDatabaseInstancesTrick.machineName;
+    return StopRdsDatabaseClustersTrick.machineName;
   }
 
   getConserveTitle(): string {
-    return 'Stop RDS Database Instances';
+    return 'Stop RDS Database Clusters';
   }
 
   getRestoreTitle(): string {
-    return 'Start RDS Database Instances';
+    return 'Start RDS Database Clusters';
   }
 
   async getCurrentState(
     task: ListrTaskWrapper,
-    currentState: StopRdsDatabaseInstancesState,
+    currentState: StopRdsDatabaseClustersState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const databases = await this.listDatabases(task);
+    const clusters = await this.listClusters(task);
 
     const subListr = new Listr({
       concurrent: true,
@@ -44,33 +44,33 @@ export class StopRdsDatabaseInstancesTrick
       collapse: false,
     } as ListrOptions);
 
-    if (!databases || databases.length === 0) {
-      task.skip('No RDS databases found');
+    if (!clusters || clusters.length === 0) {
+      task.skip('No RDS clusters found');
       return subListr;
     }
 
     subListr.add(
-      databases.map(
-        (database): ListrTask => {
+      clusters.map(
+        (cluster): ListrTask => {
           return {
             title:
-              database.DBInstanceIdentifier || chalk.italic('<no-identifier>'),
+              cluster.DBClusterIdentifier || chalk.italic('<no-identifier>'),
             task: async () => {
-              if (database.DBInstanceIdentifier === undefined) {
+              if (cluster.DBClusterIdentifier === undefined) {
                 throw new Error(
-                  `Unexpected error: DBInstanceIdentifier is missing for RDS database`,
+                  `Unexpected error: DBClusterIdentifier is missing for RDS cluster`,
                 );
               }
 
-              if (database.DBInstanceStatus === undefined) {
+              if (cluster.Status === undefined) {
                 throw new Error(
-                  `Unexpected error: DBInstanceStatus is missing for RDS database`,
+                  `Unexpected error: Status is missing for RDS cluster`,
                 );
               }
 
               currentState.push({
-                identifier: database.DBInstanceIdentifier,
-                status: database.DBInstanceStatus,
+                identifier: cluster.DBClusterIdentifier,
+                status: cluster.Status,
               });
             },
           };
@@ -83,7 +83,7 @@ export class StopRdsDatabaseInstancesTrick
 
   async conserve(
     task: ListrTaskWrapper,
-    currentState: StopRdsDatabaseInstancesState,
+    currentState: StopRdsDatabaseClustersState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
@@ -96,11 +96,11 @@ export class StopRdsDatabaseInstancesTrick
       for (const database of currentState) {
         subListr.add({
           title: chalk.blueBright(`${database.identifier}`),
-          task: (ctx, task) => this.conserveDatabase(task, database, options),
+          task: (ctx, task) => this.conserveCluster(task, database, options),
         });
       }
     } else {
-      task.skip(`No RDS databases found`);
+      task.skip(`No RDS clusters found`);
     }
 
     return subListr;
@@ -108,7 +108,7 @@ export class StopRdsDatabaseInstancesTrick
 
   async restore(
     task: ListrTaskWrapper,
-    originalState: StopRdsDatabaseInstancesState,
+    originalState: StopRdsDatabaseClustersState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = new Listr({
@@ -118,39 +118,39 @@ export class StopRdsDatabaseInstancesTrick
     } as ListrOptions);
 
     if (originalState && originalState.length > 0) {
-      for (const database of originalState) {
+      for (const cluster of originalState) {
         subListr.add({
-          title: chalk.blueBright(`${database.identifier}`),
-          task: (ctx, task) => this.restoreDatabase(task, database, options),
+          title: chalk.blueBright(`${cluster.identifier}`),
+          task: (ctx, task) => this.restoreCluster(task, cluster, options),
         });
       }
     } else {
-      task.skip(`No RDS databases was conserved`);
+      task.skip(`No RDS clusters was conserved`);
     }
 
     return subListr;
   }
 
-  private async conserveDatabase(
+  private async conserveCluster(
     task: ListrTaskWrapper,
-    databaseState: RdsDatabaseState,
+    clusterState: RdsClusterState,
     options: TrickOptionsInterface,
   ): Promise<void> {
-    if (databaseState.status !== 'available') {
+    if (clusterState.status !== 'available') {
       task.skip(
-        `Skipped, current state is not "available" it is "${databaseState.status}" instead`,
+        `Skipped, current state is not "available" it is "${clusterState.status}" instead`,
       );
       return;
     }
 
     if (options.dryRun) {
-      task.skip('Skipped, would stop the RDS instance');
+      task.skip('Skipped, would stop the RDS cluster');
       return;
     }
 
     await this.rdsClient
-      .stopDBInstance({
-        DBInstanceIdentifier: databaseState.identifier,
+      .stopDBCluster({
+        DBClusterIdentifier: clusterState.identifier,
       })
       .promise();
     // TODO Find a way to wait for "stopped" state
@@ -158,35 +158,37 @@ export class StopRdsDatabaseInstancesTrick
     task.output = 'Stopped successfully';
   }
 
-  private async restoreDatabase(
+  private async restoreCluster(
     task: ListrTaskWrapper,
-    databaseState: RdsDatabaseState,
+    clusterState: RdsClusterState,
     options: TrickOptionsInterface,
   ): Promise<void> {
-    if (databaseState.status !== 'available') {
+    if (clusterState.status !== 'available') {
       task.skip(
-        `Skipped, previous state was not "available" it was "${databaseState.status}" instead`,
+        `Skipped, previous state was not "available" it was "${clusterState.status}" instead`,
       );
       return;
     }
 
     if (options.dryRun) {
-      task.skip('Skipped, would start RDS instance');
+      task.skip('Skipped, would start RDS cluster');
       return;
     }
 
     try {
-      task.output = 'Starting RDS instance...';
+      task.output = 'Starting RDS cluster...';
       await this.rdsClient
-        .startDBInstance({
-          DBInstanceIdentifier: databaseState.identifier,
+        .startDBCluster({
+          DBClusterIdentifier: clusterState.identifier,
         })
         .promise();
 
-      task.output = 'Waiting for RDS instance to be available...';
+      task.output = 'Waiting for instances to be available...';
       await this.rdsClient
         .waitFor('dBInstanceAvailable', {
-          DBInstanceIdentifier: databaseState.identifier,
+          Filters: [
+            { Name: 'db-cluster-id', Values: [clusterState.identifier] },
+          ],
         })
         .promise();
 
@@ -201,25 +203,23 @@ export class StopRdsDatabaseInstancesTrick
     }
   }
 
-  private async listDatabases(
+  private async listClusters(
     task: ListrTaskWrapper,
-  ): Promise<AWS.RDS.DBInstanceList> {
-    const databases: AWS.RDS.DBInstanceList = [];
+  ): Promise<AWS.RDS.DBClusterList> {
+    const clusters: AWS.RDS.DBClusterList = [];
 
     // TODO Add logic to go through all pages
     task.output = 'Fetching page 1...';
-    databases.push(
-      ...(
-        (
-          await this.rdsClient
-            .describeDBInstances({
-              MaxRecords: 100,
-            })
-            .promise()
-        ).DBInstances || []
-      ).filter(instance => !instance.DBClusterIdentifier),
+    clusters.push(
+      ...(((
+        await this.rdsClient
+          .describeDBClusters({
+            MaxRecords: 100,
+          })
+          .promise()
+      ).DBClusters as AWS.RDS.DBClusterList) || []),
     );
 
-    return databases;
+    return clusters;
   }
 }
