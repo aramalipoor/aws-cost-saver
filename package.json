@@ -75,7 +75,7 @@
   "scripts": {
     "postpack": "rm -f oclif.manifest.json",
     "posttest": "eslint . --ext .ts --config .eslintrc",
-    "prepack": "rm -rf dist && tsc -b && oclif-dev manifest",
+    "prepack": "rm -rf dist && tsc --build tsconfig.json && oclif-dev manifest",
     "test": "jest --coverage --runInBand"
   },
   "types": "dist/index.d.ts"
