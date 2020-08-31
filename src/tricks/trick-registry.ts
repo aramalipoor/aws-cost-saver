@@ -9,6 +9,7 @@ import { SnapshotRemoveElasticacheRedisTrick } from './snapshot-remove-elasticac
 import { DecreaseKinesisStreamsShardsTrick } from './decrease-kinesis-streams-shards.trick';
 import { StopRdsDatabaseClustersTrick } from './stop-rds-database-clusters.trick';
 import { ScaledownAutoScalingGroupsTrick } from './scaledown-auto-scaling-groups.trick';
+import { SuspendAutoScalingGroupsTrick } from './suspend-auto-scaling-groups.trick';
 
 export class TrickRegistry {
   private registry: TrickInterface<any>[] = [];
@@ -26,6 +27,7 @@ export class TrickRegistry {
       new DecreaseKinesisStreamsShardsTrick(),
       new StopRdsDatabaseClustersTrick(),
       new ScaledownAutoScalingGroupsTrick(),
+      new SuspendAutoScalingGroupsTrick(),
     );
 
     return registry;

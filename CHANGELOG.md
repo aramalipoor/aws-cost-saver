@@ -1,3 +1,7 @@
+## [v0.0.11](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.0.11) (2020-08-31)
+* Add suspend-auto-scaling-groups trick ([#24](https://github.com/aramalipoor/aws-cost-saver/pull/24))
+* Disable scaledown-auto-scaling-groups trick by default ([#24](https://github.com/aramalipoor/aws-cost-saver/pull/24))
+
 ## [v0.0.10](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.0.10) (2020-08-30)
 * Disable incremental compilation
 

@@ -15,7 +15,7 @@ A tiny CLI tool to help save costs in development environments when you're aslee
   6. [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
   7. [decrease-kinesis-streams-shards](#-decrease-kinesis-streams-shards)
   8. [stop-rds-database-clusters](#-stop-rds-database-clusters)
-  9. [scaledown-auto-scaling-groups](#-scaledown-auto-scaling-groups)
+  9. [suspend-auto-scaling-groups](#-suspend-auto-scaling-groups)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
@@ -118,7 +118,15 @@ Kinesis Stream Shards cost hourly. This trick will decrease open shards to the m
 Stopping RDS clusters will save underlying EC2 instance costs. This trick will keep track of stopped clusters in the state-file and start them again on restore.
 
 ### # scaledown-auto-scaling-groups
-When Auto Scaling Groups are configured they might launch EC2 instances. This trick will set "desired", "min" and "max" capacity of ASGs to zero and keep track of original values in the state-file.
+When Auto Scaling Groups are configured they might launch EC2 instances. This trick will set "desired", "min" and "max" capacity of ASGs to zero and keep track of original values in the state-file. Scaling-down an ASG will terminate all instances therefore temporary volumes will be lost.
+
+* This trick is currently **disabled by default**. Use `--use-trick` flag to explicitly enable it:
+```sh
+$ aws-cost-saver conserve --use-trick scaledown-auto-scaling-groups
+```
+
+### # suspend-auto-scaling-groups
+When Auto Scaling Groups processes are active they might launch EC2 instances. This trick will suspend all processes of ASGs to prevent launching new instances.
 
 ### # TODO
 If you know any other tricks to save some money feel free to create a Pull Request or raise an issue.

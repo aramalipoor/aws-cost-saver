@@ -16,10 +16,11 @@ import { RemoveNatGatewaysTrick } from '../tricks/remove-nat-gateways.trick';
 import { SnapshotRemoveElasticacheRedisTrick } from '../tricks/snapshot-remove-elasticache-redis.trick';
 import { DecreaseKinesisStreamsShardsTrick } from '../tricks/decrease-kinesis-streams-shards.trick';
 import { StopRdsDatabaseClustersTrick } from '../tricks/stop-rds-database-clusters.trick';
-import { ScaledownAutoScalingGroupsTrick } from '../tricks/scaledown-auto-scaling-groups.trick';
+import { SuspendAutoScalingGroupsTrick } from '../tricks/suspend-auto-scaling-groups.trick';
 
 import { RootState } from '../interfaces/root-state';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { ScaledownAutoScalingGroupsTrick } from '../tricks/scaledown-auto-scaling-groups.trick';
 
 export default class Conserve extends BaseCommand {
   static tricksEnabledByDefault: readonly string[] = [
@@ -29,7 +30,7 @@ export default class Conserve extends BaseCommand {
     DecreaseDynamoDBProvisionedRcuWcuTrick.machineName,
     DecreaseKinesisStreamsShardsTrick.machineName,
     StopRdsDatabaseClustersTrick.machineName,
-    ScaledownAutoScalingGroupsTrick.machineName,
+    SuspendAutoScalingGroupsTrick.machineName,
   ];
 
   static tricksDisabledByDefault: readonly string[] = [
@@ -37,6 +38,8 @@ export default class Conserve extends BaseCommand {
     RemoveNatGatewaysTrick.machineName,
     // This is an experimental trick, plus removing and recreating ElastiCache clusters takes a long time
     SnapshotRemoveElasticacheRedisTrick.machineName,
+    // Scaling-down an ASG might cause all instance to terminate and lose their temporary volumes
+    ScaledownAutoScalingGroupsTrick.machineName,
   ];
 
   static description = [
