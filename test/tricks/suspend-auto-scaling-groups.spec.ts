@@ -79,9 +79,6 @@ describe('suspend-auto-scaling-groups', () => {
           AutoScalingGroups: [
             {
               AutoScalingGroupName: 'foo',
-              MinSize: 1,
-              MaxSize: 10,
-              DesiredCapacity: 3,
             },
           ],
         } as AWS.AutoScaling.Types.AutoScalingGroupsType);
@@ -98,9 +95,6 @@ describe('suspend-auto-scaling-groups', () => {
       expect.objectContaining([
         {
           name: 'foo',
-          desired: 3,
-          min: 1,
-          max: 10,
         } as AutoScalingGroupState,
       ]),
     );
@@ -111,16 +105,12 @@ describe('suspend-auto-scaling-groups', () => {
   it('conserves available auto scaling groups', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const updateAutoScalingGroupSpy = jest
+    const suspendProcessesSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock(
-      'AutoScaling',
-      'updateAutoScalingGroup',
-      updateAutoScalingGroupSpy,
-    );
+    AWSMock.mock('AutoScaling', 'suspendProcesses', suspendProcessesSpy);
 
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [
@@ -134,12 +124,9 @@ describe('suspend-auto-scaling-groups', () => {
     conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
-    expect(updateAutoScalingGroupSpy).toBeCalledWith(
+    expect(suspendProcessesSpy).toBeCalledWith(
       expect.objectContaining({
         AutoScalingGroupName: 'foo',
-        DesiredCapacity: 0,
-        MaxSize: 0,
-        MinSize: 0,
       }),
       expect.anything(),
     );
@@ -153,22 +140,18 @@ describe('suspend-auto-scaling-groups', () => {
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [];
 
-    const updateAutoScalingGroupSpy = jest
+    const suspendProcessesSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock(
-      'AutoScaling',
-      'updateAutoScalingGroup',
-      updateAutoScalingGroupSpy,
-    );
+    AWSMock.mock('AutoScaling', 'suspendProcesses', suspendProcessesSpy);
 
     await instance.conserve(task, stateObject, {
       dryRun: false,
     });
 
-    expect(updateAutoScalingGroupSpy).not.toBeCalled();
+    expect(suspendProcessesSpy).not.toBeCalled();
     expect(task.skip).toBeCalledWith(expect.any(String));
 
     AWSMock.restore('AutoScaling');
@@ -177,16 +160,12 @@ describe('suspend-auto-scaling-groups', () => {
   it('skips conserve if dry-run option is enabled', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const updateAutoScalingGroupSpy = jest
+    const suspendProcessesSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock(
-      'AutoScaling',
-      'updateAutoScalingGroup',
-      updateAutoScalingGroupSpy,
-    );
+    AWSMock.mock('AutoScaling', 'suspendProcesses', suspendProcessesSpy);
 
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [
@@ -201,7 +180,7 @@ describe('suspend-auto-scaling-groups', () => {
     conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
-    expect(updateAutoScalingGroupSpy).not.toBeCalled();
+    expect(suspendProcessesSpy).not.toBeCalled();
 
     AWSMock.restore('AutoScaling');
   });
@@ -209,16 +188,12 @@ describe('suspend-auto-scaling-groups', () => {
   it('restores scaled-down auto scaling groups', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const updateAutoScalingGroupSpy = jest
+    const resumeProcessesSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock(
-      'AutoScaling',
-      'updateAutoScalingGroup',
-      updateAutoScalingGroupSpy,
-    );
+    AWSMock.mock('AutoScaling', 'resumeProcesses', resumeProcessesSpy);
 
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [
@@ -232,12 +207,9 @@ describe('suspend-auto-scaling-groups', () => {
     restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
-    expect(updateAutoScalingGroupSpy).toBeCalledWith(
+    expect(resumeProcessesSpy).toBeCalledWith(
       expect.objectContaining({
         AutoScalingGroupName: 'foo',
-        DesiredCapacity: 3,
-        MaxSize: 10,
-        MinSize: 1,
       }),
       expect.anything(),
     );
@@ -248,16 +220,12 @@ describe('suspend-auto-scaling-groups', () => {
   it('skips restore if no ASGS were conserved', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const updateAutoScalingGroupSpy = jest
+    const resumeProcessesSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock(
-      'AutoScaling',
-      'updateAutoScalingGroup',
-      updateAutoScalingGroupSpy,
-    );
+    AWSMock.mock('AutoScaling', 'resumeProcesses', resumeProcessesSpy);
 
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [];
@@ -266,7 +234,7 @@ describe('suspend-auto-scaling-groups', () => {
       dryRun: false,
     });
 
-    expect(updateAutoScalingGroupSpy).not.toBeCalled();
+    expect(resumeProcessesSpy).not.toBeCalled();
     expect(task.skip).toBeCalledWith(expect.any(String));
 
     AWSMock.restore('AutoScaling');
@@ -275,16 +243,12 @@ describe('suspend-auto-scaling-groups', () => {
   it('skips restore if dry-run option is enabled', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const updateAutoScalingGroupSpy = jest
+    const resumeProcessesSpy = jest
       .fn()
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
-    AWSMock.mock(
-      'AutoScaling',
-      'updateAutoScalingGroup',
-      updateAutoScalingGroupSpy,
-    );
+    AWSMock.mock('AutoScaling', 'resumeProcesses', resumeProcessesSpy);
 
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [
@@ -299,7 +263,7 @@ describe('suspend-auto-scaling-groups', () => {
     restoreListr.setRenderer('silent');
     await restoreListr.run({});
 
-    expect(updateAutoScalingGroupSpy).not.toBeCalled();
+    expect(resumeProcessesSpy).not.toBeCalled();
 
     AWSMock.restore('AutoScaling');
   });
