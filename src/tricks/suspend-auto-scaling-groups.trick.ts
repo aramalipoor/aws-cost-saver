@@ -69,8 +69,7 @@ export class SuspendAutoScalingGroupsTrick
       for (const asgState of currentState) {
         subListr.add({
           title: chalk.blueBright(`${asgState.name}`),
-          task: (ctx, task) =>
-            this.conserveAutoScalingGroup(task, asgState, options),
+          task: (ctx, task) => this.conserveProcesses(task, asgState, options),
         });
       }
     } else {
@@ -95,8 +94,7 @@ export class SuspendAutoScalingGroupsTrick
       for (const asgState of originalState) {
         subListr.add({
           title: chalk.blueBright(`${asgState.name}`),
-          task: (ctx, task) =>
-            this.restoreAutoScalingGroup(task, asgState, options),
+          task: (ctx, task) => this.restoreProcesses(task, asgState, options),
         });
       }
     } else {
@@ -124,7 +122,7 @@ export class SuspendAutoScalingGroupsTrick
     return groups;
   }
 
-  private async conserveAutoScalingGroup(
+  private async conserveProcesses(
     task: ListrTaskWrapper,
     asgState: AutoScalingGroupState,
     options: TrickOptionsInterface,
@@ -144,7 +142,7 @@ export class SuspendAutoScalingGroupsTrick
     task.output = 'Suspended';
   }
 
-  private async restoreAutoScalingGroup(
+  private async restoreProcesses(
     task: ListrTaskWrapper,
     asgState: AutoScalingGroupState,
     options: TrickOptionsInterface,
