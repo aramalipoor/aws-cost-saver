@@ -15,7 +15,8 @@ A tiny CLI tool to help save costs in development environments when you're aslee
   6. [snapshot-and-remove-elasticache-clusters](#-snapshot-and-remove-elasticache-clusters)
   7. [decrease-kinesis-streams-shards](#-decrease-kinesis-streams-shards)
   8. [stop-rds-database-clusters](#-stop-rds-database-clusters)
-  9. [suspend-auto-scaling-groups](#-suspend-auto-scaling-groups)
+  9. [scaledown-auto-scaling-groups](#-scaledown-auto-scaling-groups)
+  10. [suspend-auto-scaling-groups](#-suspend-auto-scaling-groups)
 
 ### Disclaimer
 This utility is meant for **development** environments only where stopping and removing resources is not risky.
