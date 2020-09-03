@@ -1,7 +1,12 @@
 import chalk from 'chalk';
 import { writeFileSync } from 'fs';
 import { flags } from '@oclif/command';
-import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
+import {
+  Listr,
+  ListrDefaultRendererOptions,
+  ListrTask,
+  ListrTaskWrapper,
+} from 'listr2';
 
 import BaseCommand from '../base-command';
 import { configureAWS } from '../configure-aws';
@@ -133,26 +138,41 @@ export default class Conserve extends BaseCommand {
 
     const tricks = this.getEnabledTricks(flags);
     const rootState: RootState = {};
-    const rootTaskList: ListrTask<RootState>[] = [];
+    const rootTaskList: ListrTask[] = [];
     const options: TrickOptionsInterface = {
       dryRun: flags['dry-run'],
     };
 
     for (const trick of tricks) {
       rootTaskList.push({
-        title: `${trick.getConserveTitle()}`,
-        task: () => this.createTrickListr(rootState, trick, options),
-      } as ListrTask);
+        title: `${chalk.dim(`conserve:`)} ${trick.getMachineName()}`,
+        task: (ctx, task) =>
+          this.createTrickListr(task, rootState, trick, options),
+      });
     }
 
-    await new Listr<RootState>(rootTaskList, {
-      renderer: process.env.NODE_ENV === 'test' ? 'silent' : 'default',
-      concurrent: true,
+    const listr = new Listr(rootTaskList, {
+      concurrent: false,
       exitOnError: false,
-      collapse: true,
-    } as ListrOptions)
+      rendererOptions: {
+        collapse: false,
+        collapseSkips: false,
+        showTimer: true,
+        showSubtasks: true,
+        clearOutput: false,
+      },
+    } as ListrDefaultRendererOptions<any>);
+
+    await listr
       .run(rootState)
       .finally(() => {
+        listr.rendererClassOptions = {
+          collapse: true,
+          collapseSkips: false,
+          showTimer: true,
+          showSubtasks: true,
+          clearOutput: false,
+        };
         if (!flags['no-state-file']) {
           writeFileSync(
             flags['state-file'],
@@ -191,17 +211,18 @@ export default class Conserve extends BaseCommand {
   }
 
   private createTrickListr(
+    task: ListrTaskWrapper<any, any>,
     rootState: RootState,
     trick: TrickInterface<any>,
     options: TrickOptionsInterface,
-  ) {
+  ): Listr<any, any, any> {
     rootState[trick.getMachineName()] = [];
 
-    return new Listr<any>(
+    return task.newListr(
       [
         {
-          title: `Fetch current state`,
-          task: (ctx: RootState, task: ListrTaskWrapper<RootState>) =>
+          title: 'fetch current state',
+          task: (ctx, task) =>
             trick.getCurrentState(
               task,
               rootState[trick.getMachineName()],
@@ -209,16 +230,17 @@ export default class Conserve extends BaseCommand {
             ),
         },
         {
-          title: `Conserve resources`,
-          task: (ctx: RootState, task: ListrTaskWrapper<RootState>) =>
+          task: (ctx, task) =>
             trick.conserve(task, rootState[trick.getMachineName()], options),
         },
       ],
       {
         concurrent: false,
-        exitOnError: true,
-        collapse: false,
-      } as ListrOptions,
+        rendererOptions: {
+          collapse: false,
+          collapseSkips: false,
+        },
+      },
     );
   }
 

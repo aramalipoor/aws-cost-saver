@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { flags } from '@oclif/command';
-import Listr, { ListrOptions, ListrTask } from 'listr';
+import { Listr, ListrTask } from 'listr2';
 
 import BaseCommand from '../base-command';
 import { TrickRegistry } from '../tricks/trick-registry';
@@ -59,7 +59,7 @@ export default class Restore extends BaseCommand {
 
     for (const trick of tricksRegistry.all()) {
       taskList.push({
-        title: `${trick.getRestoreTitle()}`,
+        title: `${chalk.dim(`restore:`)} ${trick.getMachineName()}`,
         task: async (ctx, task) => {
           if (!rootState[trick.getMachineName()]) {
             return task.skip('Nothing was conserved previously.');
@@ -74,12 +74,18 @@ export default class Restore extends BaseCommand {
       } as ListrTask);
     }
 
-    await new Listr<RootState>(taskList, {
-      renderer: process.env.NODE_ENV === 'test' ? 'silent' : 'default',
-      concurrent: true,
+    const listr = new Listr<RootState>(taskList, {
+      concurrent: false,
       exitOnError: false,
-      collapse: true,
-    } as ListrOptions)
+      rendererOptions: {
+        collapse: false,
+        collapseSkips: false,
+        showTimer: true,
+        showSubtasks: true,
+      },
+    });
+
+    await listr
       .run()
       .then(() => {
         if (flags['dry-run']) {
