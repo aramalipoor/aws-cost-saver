@@ -77,7 +77,6 @@ export class StopFargateEcsServicesTrick
       exitOnError: false,
       rendererOptions: {
         collapse: false,
-        collapseSkips: false,
       },
     });
 
@@ -120,7 +119,6 @@ export class StopFargateEcsServicesTrick
                 concurrent: true,
                 rendererOptions: {
                   collapse: false,
-                  collapseSkips: false,
                 },
               },
             ),
@@ -141,7 +139,6 @@ export class StopFargateEcsServicesTrick
       exitOnError: false,
       rendererOptions: {
         collapse: false,
-        collapseSkips: false,
       },
     });
 
@@ -184,7 +181,6 @@ export class StopFargateEcsServicesTrick
                 concurrent: true,
                 rendererOptions: {
                   collapse: false,
-                  collapseSkips: false,
                 },
               },
             ),
@@ -315,7 +311,7 @@ export class StopFargateEcsServicesTrick
     task.output = `Fetching all services ARNs...`;
     const servicesArn = await this.listServices(task, clusterArn);
     const chunks = _.chunk<string>(servicesArn, 10);
-    const result: AWS.ECS.Service[] = [];
+    const result: AWS.ECS.Services = [];
 
     for (let i = 0, c = chunks.length; i < c; i++) {
       task.output = `Describing services, page ${i + 1} of ${c}...`;
@@ -323,7 +319,7 @@ export class StopFargateEcsServicesTrick
         .describeServices({ services: chunks[i], cluster: clusterArn })
         .promise();
 
-      result.push(...(response.services || []));
+      result.push(...(response.services as AWS.ECS.Services));
     }
 
     task.output = 'done';

@@ -59,7 +59,6 @@ export class ScaledownAutoScalingGroupsTrick
       exitOnError: false,
       rendererOptions: {
         collapse: false,
-        collapseSkips: false,
       },
     });
 

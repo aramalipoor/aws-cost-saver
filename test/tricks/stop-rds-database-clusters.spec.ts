@@ -1,7 +1,7 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
-
-import { ListrTaskWrapper } from 'listr';
+import { mockProcessStdout } from 'jest-mock-process';
+import { ListrTaskWrapper } from 'listr2';
 
 import {
   StopRdsDatabaseClustersTrick,
@@ -9,26 +9,23 @@ import {
 } from '../../src/tricks/stop-rds-database-clusters.trick';
 import { RdsClusterState } from '../../src/states/rds-cluster.state';
 
+import { createMockTask } from '../util';
+
 beforeAll(async done => {
   // AWSMock cannot mock waiters at the moment
   AWS.RDS.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
   }));
 
+  mockProcessStdout();
   done();
 });
 
 describe('stop-rds-database-clusters', () => {
-  let task: ListrTaskWrapper;
+  let task: ListrTaskWrapper<any, any>;
 
   beforeEach(() => {
-    task = {
-      title: '',
-      output: '',
-      run: jest.fn(),
-      skip: jest.fn(),
-      report: jest.fn(),
-    };
+    task = createMockTask();
   });
 
   it('returns correct machine name', async () => {
@@ -36,11 +33,6 @@ describe('stop-rds-database-clusters', () => {
     expect(instance.getMachineName()).toBe(
       StopRdsDatabaseClustersTrick.machineName,
     );
-  });
-
-  it('returns different title for conserve and restore commands', async () => {
-    const instance = new StopRdsDatabaseClustersTrick();
-    expect(instance.getConserveTitle()).not.toBe(instance.getRestoreTitle());
   });
 
   it('returns an empty Listr if no databases found', async () => {
@@ -107,15 +99,18 @@ describe('stop-rds-database-clusters', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
 
-    await expect(async () => listr.run()).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          message: expect.stringContaining('DBClusterIdentifier is missing'),
-        }),
-      ]),
-    });
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/DBClusterIdentifier is missing/gi),
+          }),
+        ],
+      }),
+    ]);
 
     AWSMock.restore('RDS');
   });
@@ -138,15 +133,18 @@ describe('stop-rds-database-clusters', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
 
-    await expect(async () => listr.run()).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          message: expect.stringContaining('Status is missing'),
-        }),
-      ]),
-    });
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/Status is missing/gi),
+          }),
+        ],
+      }),
+    ]);
 
     AWSMock.restore('RDS');
   });
@@ -170,7 +168,6 @@ describe('stop-rds-database-clusters', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject).toStrictEqual(
@@ -204,7 +201,6 @@ describe('stop-rds-database-clusters', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
@@ -235,7 +231,7 @@ describe('stop-rds-database-clusters', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(stopDBClusterSpy).toBeCalledWith(
@@ -279,7 +275,6 @@ describe('stop-rds-database-clusters', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
     await conserveListr.run({});
 
     expect(stopDBClusterSpy).not.toBeCalled();
@@ -308,7 +303,7 @@ describe('stop-rds-database-clusters', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(stopDBClusterSpy).not.toBeCalled();
@@ -336,7 +331,7 @@ describe('stop-rds-database-clusters', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(startDBClusterSpy).toBeCalledWith(
@@ -380,7 +375,7 @@ describe('stop-rds-database-clusters', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(startDBClusterSpy).not.toBeCalled();
@@ -409,7 +404,7 @@ describe('stop-rds-database-clusters', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(startDBClusterSpy).toBeCalled();
@@ -438,9 +433,14 @@ describe('stop-rds-database-clusters', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
 
-    await expect(async () => restoreListr.run()).rejects.toThrow();
+    await restoreListr.run();
+
+    expect(restoreListr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [expect.any(Object)],
+      }),
+    ]);
 
     expect(startDBClusterSpy).toBeCalled();
 
@@ -465,7 +465,7 @@ describe('stop-rds-database-clusters', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(startDBClusterSpy).not.toBeCalled();
@@ -494,7 +494,7 @@ describe('stop-rds-database-clusters', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(startDBClusterSpy).not.toBeCalled();

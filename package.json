@@ -25,6 +25,7 @@
     "@oclif/dev-cli": "^1.22.2",
     "@oclif/test": "^1.2.6",
     "@types/aws-sdk": "^2.7.0",
+    "@types/figures": "^3.0.1",
     "@types/inquirer": "^7.3.1",
     "@types/jest": "^26.0.10",
     "@types/lodash": "^4.14.159",
@@ -41,7 +42,8 @@
     "prettier": "^1.19.1",
     "ts-jest": "^26.3.0",
     "ts-node": "^8.10.2",
-    "typescript": "^3.9.7"
+    "typescript": "^3.9.7",
+    "jest-mock-process": "^1.4.0"
   },
   "engines": {
     "node": ">=8.0.0"

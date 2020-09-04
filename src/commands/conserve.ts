@@ -7,6 +7,7 @@ import {
   ListrTask,
   ListrTaskWrapper,
 } from 'listr2';
+import figures from 'figures';
 
 import BaseCommand from '../base-command';
 import { configureAWS } from '../configure-aws';
@@ -62,6 +63,7 @@ export default class Conserve extends BaseCommand {
     `$ aws-cost-saver conserve`,
     `$ aws-cost-saver conserve ${chalk.yellow('--dry-run')}`,
     `$ aws-cost-saver conserve ${chalk.yellow('--no-state-file')}`,
+    `$ aws-cost-saver conserve ${chalk.yellow('--only-summary')}`,
     `$ aws-cost-saver conserve ${chalk.yellow(
       `--use-trick ${chalk.bold(
         SnapshotRemoveElasticacheRedisTrick.machineName,
@@ -91,8 +93,7 @@ export default class Conserve extends BaseCommand {
     profile: flags.string({ char: 'p', default: 'default' }),
     'dry-run': flags.boolean({
       char: 'd',
-      description:
-        'Only print actions and write state-file of current resources.',
+      description: 'Only list actions and do not actually execute them.',
     }),
     'state-file': flags.string({
       char: 's',
@@ -123,6 +124,12 @@ export default class Conserve extends BaseCommand {
       description:
         'Disables all default tricks. Useful alongside --use-trick when you only want a set of specific tricks to execute.',
     }),
+    'only-summary': flags.boolean({
+      char: 'm',
+      default: false,
+      description:
+        'Do not render live progress. Only print final summary in a clean format.',
+    }),
   };
 
   static args = [];
@@ -152,62 +159,60 @@ export default class Conserve extends BaseCommand {
     }
 
     const listr = new Listr(rootTaskList, {
-      concurrent: false,
+      renderer: flags['only-summary'] ? 'silent' : 'default',
+      concurrent: true,
       exitOnError: false,
       rendererOptions: {
         collapse: false,
-        collapseSkips: false,
         showTimer: true,
         showSubtasks: true,
-        clearOutput: false,
+        clearOutput: true,
       },
     } as ListrDefaultRendererOptions<any>);
 
-    await listr
-      .run(rootState)
-      .finally(() => {
-        listr.rendererClassOptions = {
-          collapse: true,
-          collapseSkips: false,
-          showTimer: true,
-          showSubtasks: true,
-          clearOutput: false,
-        };
-        if (!flags['no-state-file']) {
-          writeFileSync(
-            flags['state-file'],
-            JSON.stringify(rootState, null, 2),
-            'utf-8',
-          );
-          this.log(
-            `\n  ${chalk.green('❯')} Wrote state file to ${chalk.green(
-              flags['state-file'],
-            )}`,
-          );
-        }
-      })
-      .then(() => {
-        if (flags['dry-run']) {
-          this.log(`\n${chalk.yellow(' ↓ Skipped conserve due to dry-run.')}`);
-        } else {
-          this.log(`\n ${chalk.green('✔')} Successfully conserved.`);
-        }
-      })
-      .catch(error => {
-        if (error.errors.length < rootTaskList.length) {
-          this.log(
-            `\n${chalk.yellow('✔')} Partially conserved, with ${chalk.red(
-              `${error.errors.length} error(s)`,
-            )}.`,
-          );
-        } else {
-          this.log(
-            `\n${chalk.red('✖')} All ${chalk.red(
-              `${rootTaskList.length} tricks failed`,
-            )} with errors.`,
-          );
-        }
-      });
+    await listr.run(rootState);
+    this.renderSummary(listr.tasks);
+
+    if (!flags['no-state-file']) {
+      writeFileSync(
+        flags['state-file'],
+        JSON.stringify(rootState, null, 2),
+        'utf-8',
+      );
+      this.log(
+        `\n  ${chalk.green(figures.pointer)} Wrote state file to ${chalk.green(
+          flags['state-file'],
+        )}`,
+      );
+    }
+
+    const errors = this.collectErrors(listr.tasks);
+
+    if (errors && errors.length > 0) {
+      if (errors.length < listr.tasks.length) {
+        this.log(
+          `\n${chalk.yellow(figures.tick)} Partially finished, with ${chalk.red(
+            `${errors.length} failed tricks out of ${listr.tasks.length}`,
+          )}.`,
+        );
+        throw new Error('ConservePartialFailure');
+      } else {
+        this.log(
+          `\n${chalk.yellow(figures.cross)} All ${
+            listr.tasks.length
+          } tricks failed.`,
+        );
+        throw new Error('ConserveFailure');
+      }
+    } else if (flags['dry-run']) {
+      this.log(
+        `\n${chalk.yellow(
+          ` ${figures.warning} Skipped conserve due to dry-run.`,
+        )}`,
+      );
+    } else {
+      this.log(`\n ${chalk.green(figures.tick)} Successfully conserved.`);
+    }
   }
 
   private createTrickListr(
@@ -230,15 +235,16 @@ export default class Conserve extends BaseCommand {
             ),
         },
         {
+          title: 'conserve resources',
           task: (ctx, task) =>
             trick.conserve(task, rootState[trick.getMachineName()], options),
         },
       ],
       {
         concurrent: false,
+        exitOnError: false,
         rendererOptions: {
           collapse: false,
-          collapseSkips: false,
         },
       },
     );

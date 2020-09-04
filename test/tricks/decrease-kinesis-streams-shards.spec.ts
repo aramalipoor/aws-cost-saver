@@ -1,7 +1,9 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
+import { mockProcessStdout } from 'jest-mock-process';
+import { ListrTaskWrapper } from 'listr2';
 
-import { ListrTaskWrapper } from 'listr';
+import { createMockTask } from '../util';
 
 import {
   DecreaseKinesisStreamsShardsTrick,
@@ -14,20 +16,15 @@ beforeAll(async done => {
     promise: jest.fn(),
   }));
 
+  mockProcessStdout();
   done();
 });
 
 describe('decrease-kinesis-streams-shards', () => {
-  let task: ListrTaskWrapper;
+  let task: ListrTaskWrapper<any, any>;
 
   beforeEach(() => {
-    task = {
-      title: '',
-      output: '',
-      run: jest.fn(),
-      skip: jest.fn(),
-      report: jest.fn(),
-    };
+    task = createMockTask();
   });
 
   it('returns correct machine name', async () => {
@@ -35,11 +32,6 @@ describe('decrease-kinesis-streams-shards', () => {
     expect(instance.getMachineName()).toBe(
       DecreaseKinesisStreamsShardsTrick.machineName,
     );
-  });
-
-  it('returns different title for conserve and restore commands', async () => {
-    const instance = new DecreaseKinesisStreamsShardsTrick();
-    expect(instance.getConserveTitle()).not.toBe(instance.getRestoreTitle());
   });
 
   it('returns an empty Listr if no streams found', async () => {
@@ -103,7 +95,6 @@ describe('decrease-kinesis-streams-shards', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject).toMatchObject([
@@ -138,7 +129,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateShardCountSpy).toBeCalledTimes(2);
@@ -185,7 +176,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateShardCountSpy).toBeCalledWith(
@@ -255,7 +246,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();
@@ -280,7 +271,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();
@@ -329,7 +320,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();
@@ -374,7 +365,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateShardCountSpy).toBeCalledTimes(3);
@@ -446,7 +437,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateShardCountSpy).toBeCalledTimes(2);
@@ -509,7 +500,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();
@@ -535,7 +526,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();
@@ -561,7 +552,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();
@@ -602,7 +593,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();
@@ -628,7 +619,7 @@ describe('decrease-kinesis-streams-shards', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateShardCountSpy).not.toBeCalled();

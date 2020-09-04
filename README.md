@@ -29,6 +29,7 @@ $ npm install -g aws-cost-saver
 # Try
 $ aws-cost-saver conserve --help
 $ aws-cost-saver conserve --dry-run --no-state-file
+$ aws-cost-saver conserve --dry-run --no-state-file --only-summary
 
 # Use
 $ aws-cost-saver conserve
@@ -54,8 +55,9 @@ OPTIONS
   -u, --use-trick trick-machine-name     Enables an individual trick. Useful for tricks that are disabled by default. Can be used multiple times.
   -i, --ignore-trick trick-machine-name  Disables an individual trick. Useful when you do not like to use a specific trick. Can be used multiple times.
   --no-default-tricks                    Disables all default tricks. Useful alongside --use-trick to enable only specific set of tricks.
-  -r, --region eu-central-1              [default: eu-central-1] AWS Region to converse resources in
+  -r, --region eu-central-1              [default: eu-central-1] AWS Region to converse resources in.
   -p, --profile my-aws-profile           [default: default] AWS Profile to use from ~/.aws/config
+  -m, --only-summary                     Do not render live progress. Only print final summary in a clean format.
   -h, --help                             Show CLI help
 ```
 
@@ -76,6 +78,7 @@ OPTIONS
   -s, --state-file       [default: aws-cost-saver.json] Path to load previous state of your AWS resources from.
   -r, --region           [default: eu-central-1] AWS region to restore resoruces in.
   -p, --profile          [default: default] AWS profile to lookup from ~/.aws/config
+  -m, --only-summary     Do not render live progress. Only print final summary in a clean format.
   -h, --help             Show CLI help.
 ```
 

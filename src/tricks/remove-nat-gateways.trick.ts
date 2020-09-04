@@ -43,6 +43,14 @@ export class RemoveNatGatewaysTrick
       },
     });
 
+    if (natGateways.length === 0) {
+      return subListr;
+    }
+
+    task.output = 'fetching all routes...';
+    await this.getAllRouteTables();
+
+    task.output = 'fetching NAT gateways...';
     subListr.add(
       natGateways.map(
         (natGateway): ListrTask => {
@@ -86,6 +94,7 @@ export class RemoveNatGatewaysTrick
       ),
     );
 
+    task.output = 'done';
     return subListr;
   }
 

@@ -142,11 +142,11 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     tableState: DynamoDBTableState,
   ): Promise<void> {
     task.output = 'fetching table information...';
-    const provisionedThroughput = (
+    const provisionedThroughput = ((
       await this.ddbClient
         .describeTable({ TableName: tableState.name })
         .promise()
-    ).Table?.ProvisionedThroughput;
+    ).Table as AWS.DynamoDB.TableDescription).ProvisionedThroughput;
 
     if (!provisionedThroughput) {
       tableState.provisionedThroughput = false;
@@ -154,8 +154,8 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     }
 
     tableState.provisionedThroughput = true;
-    tableState.rcu = provisionedThroughput.ReadCapacityUnits || 1;
-    tableState.wcu = provisionedThroughput.WriteCapacityUnits || 1;
+    tableState.rcu = provisionedThroughput.ReadCapacityUnits as number;
+    tableState.wcu = provisionedThroughput.WriteCapacityUnits as number;
 
     task.output = 'done';
   }
