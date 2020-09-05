@@ -102,7 +102,9 @@ AWS Cost Saver
         this.consoleWriteLine(
           `${' '.repeat(level)}${
             task.isSkipped()
-              ? chalk.yellow(figures.arrowDown)
+              ? chalk.yellow(
+                  level === 0 ? figures.circleDouble : figures.arrowDown,
+                )
               : chalk.green(level === 0 ? figures.circleDouble : figures.tick)
           } ${task.cleanTitle}`,
         );
