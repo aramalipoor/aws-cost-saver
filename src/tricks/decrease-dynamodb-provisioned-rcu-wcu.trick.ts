@@ -72,7 +72,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      rendererOptions: { collapse: false },
+      rendererOptions: { collapse: true },
     });
 
     if (currentState && currentState.length > 0) {
@@ -101,7 +101,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      rendererOptions: { collapse: false },
+      rendererOptions: { collapse: true },
     });
 
     if (currentState && currentState.length > 0) {

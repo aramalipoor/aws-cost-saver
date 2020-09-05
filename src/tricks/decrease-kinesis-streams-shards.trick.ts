@@ -72,7 +72,7 @@ export class DecreaseKinesisStreamsShardsTrick
     const subListr = task.newListr([], {
       concurrent: 3,
       exitOnError: false,
-      rendererOptions: { collapse: false },
+      rendererOptions: { collapse: true },
     });
 
     if (currentState && currentState.length > 0) {
@@ -100,7 +100,7 @@ export class DecreaseKinesisStreamsShardsTrick
     const subListr = task.newListr([], {
       concurrent: 3,
       exitOnError: false,
-      rendererOptions: { collapse: false },
+      rendererOptions: { collapse: true },
     });
 
     if (originalState && originalState.length > 0) {

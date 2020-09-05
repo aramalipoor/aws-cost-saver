@@ -58,7 +58,7 @@ export class ScaledownAutoScalingGroupsTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -89,7 +89,7 @@ export class ScaledownAutoScalingGroupsTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 

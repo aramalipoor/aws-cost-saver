@@ -88,7 +88,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -119,7 +119,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 

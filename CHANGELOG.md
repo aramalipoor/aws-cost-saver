@@ -1,4 +1,5 @@
 ## [v0.0.12](https://github.com/aramalipoor/aws-cost-saver/compare/v0.0.11...v0.0.12) (2020-XX-XX)
+* Collapse when actions finish to keep clutter to minimum during operations ([#26](https://github.com/aramalipoor/aws-cost-saver/pull/26))
 * Introduce -m|--only-summary flag to print a clean summary of actions ([#26](https://github.com/aramalipoor/aws-cost-saver/pull/26))
 * Use listr2 instead of listr npm package for per-task options ([#26](https://github.com/aramalipoor/aws-cost-saver/pull/26))
 

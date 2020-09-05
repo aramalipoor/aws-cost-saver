@@ -98,7 +98,7 @@ export class ShutdownEC2InstancesTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -128,7 +128,7 @@ export class ShutdownEC2InstancesTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 

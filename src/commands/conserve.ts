@@ -163,7 +163,7 @@ export default class Conserve extends BaseCommand {
       concurrent: true,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
         showTimer: true,
         showSubtasks: true,
         clearOutput: true,
@@ -244,7 +244,7 @@ export default class Conserve extends BaseCommand {
         concurrent: false,
         exitOnError: false,
         rendererOptions: {
-          collapse: false,
+          collapse: true,
         },
       },
     );

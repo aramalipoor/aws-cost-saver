@@ -78,7 +78,7 @@ export default class Restore extends BaseCommand {
             .catch(task.report);
         },
         exitOnError: false,
-        collapse: false,
+        collapse: true,
       } as ListrTask);
     }
 
@@ -87,7 +87,7 @@ export default class Restore extends BaseCommand {
       concurrent: true,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
         showTimer: true,
         showSubtasks: true,
         clearOutput: true,

@@ -76,7 +76,7 @@ export class StopFargateEcsServicesTrick
       concurrent: 3,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -118,7 +118,7 @@ export class StopFargateEcsServicesTrick
                 exitOnError: false,
                 concurrent: true,
                 rendererOptions: {
-                  collapse: false,
+                  collapse: true,
                 },
               },
             ),
@@ -138,7 +138,7 @@ export class StopFargateEcsServicesTrick
       concurrent: 3,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -180,7 +180,7 @@ export class StopFargateEcsServicesTrick
                 exitOnError: false,
                 concurrent: true,
                 rendererOptions: {
-                  collapse: false,
+                  collapse: true,
                 },
               },
             ),
@@ -206,7 +206,7 @@ export class StopFargateEcsServicesTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 

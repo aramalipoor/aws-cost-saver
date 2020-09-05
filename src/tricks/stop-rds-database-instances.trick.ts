@@ -84,7 +84,7 @@ export class StopRdsDatabaseInstancesTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -114,7 +114,7 @@ export class StopRdsDatabaseInstancesTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 

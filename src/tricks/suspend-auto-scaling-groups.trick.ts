@@ -55,7 +55,7 @@ export class SuspendAutoScalingGroupsTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -85,7 +85,7 @@ export class SuspendAutoScalingGroupsTrick
       concurrent: 10,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 

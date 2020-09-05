@@ -107,7 +107,7 @@ export class RemoveNatGatewaysTrick
       concurrent: 1,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
@@ -135,7 +135,7 @@ export class RemoveNatGatewaysTrick
       concurrent: 1,
       exitOnError: false,
       rendererOptions: {
-        collapse: false,
+        collapse: true,
       },
     });
 
