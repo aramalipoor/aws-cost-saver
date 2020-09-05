@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
-import Listr, { ListrOptions, ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
+import { Listr, ListrTaskWrapper } from 'listr2';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -23,23 +23,15 @@ export class ScaledownAutoScalingGroupsTrick
     return ScaledownAutoScalingGroupsTrick.machineName;
   }
 
-  getConserveTitle(): string {
-    return 'Scale-down Auto Scaling Groups';
-  }
-
-  getRestoreTitle(): string {
-    return 'Restore Auto Scaling Groups';
-  }
-
   async getCurrentState(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: ScaledownAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     const scalingGroups = await this.listAutoScalingGroups(task);
 
     if (!scalingGroups || scalingGroups.length === 0) {
-      task.skip('No ASG found');
+      task.skip(chalk.dim('No ASG found'));
       return;
     }
 
@@ -58,64 +50,74 @@ export class ScaledownAutoScalingGroupsTrick
   }
 
   async conserve(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: ScaledownAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (currentState && currentState.length > 0) {
       for (const asgState of currentState) {
         subListr.add({
-          title: chalk.blueBright(`${asgState.name}`),
+          title: chalk.greenBright(`${asgState.name}`),
           task: (ctx, task) =>
             this.conserveAutoScalingGroup(task, asgState, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No auto scaling groups found`);
+      task.skip(chalk.dim(`no auto scaling groups found`));
     }
 
     return subListr;
   }
 
   async restore(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     originalState: ScaledownAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (originalState && originalState.length > 0) {
       for (const asgState of originalState) {
         subListr.add({
-          title: chalk.blueBright(`${asgState.name}`),
+          title: chalk.greenBright(`${asgState.name}`),
           task: (ctx, task) =>
             this.restoreAutoScalingGroup(task, asgState, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No auto scaling groups were conserved`);
+      task.skip(chalk.dim(`no auto scaling groups were conserved`));
     }
 
     return subListr;
   }
 
   private async listAutoScalingGroups(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
   ): Promise<AWS.AutoScaling.AutoScalingGroups> {
     const groups: AWS.AutoScaling.AutoScalingGroups = [];
 
     // TODO Add logic to go through all pages
-    task.output = 'Fetching page 1...';
+    task.output = 'fetching page 1...';
     groups.push(
       ...(
         await this.asClient
@@ -124,22 +126,25 @@ export class ScaledownAutoScalingGroupsTrick
       ).AutoScalingGroups,
     );
 
+    task.output = 'done';
     return groups;
   }
 
   private async conserveAutoScalingGroup(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     asgState: AutoScalingGroupState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (options.dryRun) {
       task.skip(
-        'Skipped, would scale down the ASG desired = 0 min = 0 max = 0',
+        chalk.dim(
+          'skipped, would scale down the ASG desired = 0 min = 0 max = 0',
+        ),
       );
       return;
     }
 
-    task.output = 'Scaling down ASG...';
+    task.output = 'scaling down ASG...';
     await this.asClient
       .updateAutoScalingGroup({
         AutoScalingGroupName: asgState.name,
@@ -149,22 +154,24 @@ export class ScaledownAutoScalingGroupsTrick
       })
       .promise();
 
-    task.output = 'Scaled down';
+    task.output = 'scaled down';
   }
 
   private async restoreAutoScalingGroup(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     asgState: AutoScalingGroupState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (options.dryRun) {
       task.skip(
-        `Skipped, would restore the ASG to desired = ${asgState.desired} min = ${asgState.min} max = ${asgState.max}`,
+        chalk.dim(
+          `skipped, would restore the ASG to desired = ${asgState.desired} min = ${asgState.min} max = ${asgState.max}`,
+        ),
       );
       return;
     }
 
-    task.output = 'Restoring ASG...';
+    task.output = 'restoring ASG...';
     await this.asClient
       .updateAutoScalingGroup({
         AutoScalingGroupName: asgState.name,

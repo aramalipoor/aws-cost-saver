@@ -1,13 +1,14 @@
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { flags } from '@oclif/command';
-import Listr, { ListrOptions, ListrTask } from 'listr';
+import { Listr, ListrTask } from 'listr2';
 
 import BaseCommand from '../base-command';
 import { TrickRegistry } from '../tricks/trick-registry';
 import { configureAWS } from '../configure-aws';
 import { RootState } from '../interfaces/root-state';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import figures from 'figures';
 
 export default class Restore extends BaseCommand {
   static description =
@@ -16,6 +17,7 @@ export default class Restore extends BaseCommand {
   static examples = [
     `$ aws-cost-saver restore`,
     `$ aws-cost-saver restore ${chalk.yellow('--dry-run')}`,
+    `$ aws-cost-saver restore ${chalk.yellow('--only-summary')}`,
     `$ aws-cost-saver restore ${chalk.yellow(
       `--region ${chalk.bold(`eu-central-1`)} --profile ${chalk.bold(
         `my-aws-profile`,
@@ -32,13 +34,19 @@ export default class Restore extends BaseCommand {
     profile: flags.string({ char: 'p', default: 'default' }),
     'dry-run': flags.boolean({
       char: 'd',
-      description: 'Only print actions but do not do them',
+      description: 'Only list actions and do not actually execute them.',
     }),
     'state-file': flags.string({
       char: 's',
       default: 'aws-cost-saver.json',
       description:
         'Path to state-file which contains original state of AWS resources to restore to.',
+    }),
+    'only-summary': flags.boolean({
+      char: 'm',
+      default: false,
+      description:
+        'Do not render live progress. Only print final summary in a clean format.',
     }),
   };
 
@@ -59,7 +67,7 @@ export default class Restore extends BaseCommand {
 
     for (const trick of tricksRegistry.all()) {
       taskList.push({
-        title: `${trick.getRestoreTitle()}`,
+        title: `${chalk.dim(`restore:`)} ${trick.getMachineName()}`,
         task: async (ctx, task) => {
           if (!rootState[trick.getMachineName()]) {
             return task.skip('Nothing was conserved previously.');
@@ -70,36 +78,38 @@ export default class Restore extends BaseCommand {
             .catch(task.report);
         },
         exitOnError: false,
-        collapse: false,
+        collapse: true,
       } as ListrTask);
     }
 
-    await new Listr<RootState>(taskList, {
-      renderer: process.env.NODE_ENV === 'test' ? 'silent' : 'default',
+    const listr = new Listr<RootState, 'silent' | 'default'>(taskList, {
+      renderer: flags['only-summary'] ? 'silent' : 'default',
       concurrent: true,
       exitOnError: false,
-      collapse: true,
-    } as ListrOptions)
-      .run()
-      .then(() => {
-        if (flags['dry-run']) {
-          this.log(`\n${chalk.yellow(' ↓ Skipped restore due to dry-run.')}`);
-        } else {
-          this.log(
-            `\n ${chalk.green(
-              '✔',
-            )} Successfully restored state from ${chalk.green(
-              flags['state-file'],
-            )}`,
-          );
-        }
-      })
-      .catch(error => {
-        this.log(
-          `\n${chalk.yellow('✔')} Partially restored, with ${chalk.red(
-            `${error.errors.length} errors`,
-          )}.`,
-        );
-      });
+      rendererOptions: {
+        collapse: true,
+        showTimer: true,
+        showSubtasks: true,
+        clearOutput: true,
+      },
+    });
+
+    await listr.run();
+    this.renderSummary(listr.tasks);
+
+    const errors = this.collectErrors(listr.tasks);
+
+    if (errors && errors.length > 0) {
+      this.log(
+        `\n${chalk.yellow(figures.tick)} Partially finished, with ${chalk.red(
+          `${errors.length} failed tricks out of ${listr.tasks.length}`,
+        )}.`,
+      );
+      throw new Error('RestorePartialFailure');
+    } else if (flags['dry-run']) {
+      this.log(`\n${chalk.yellow(' ↓ Skipped restore due to dry-run.')}`);
+    } else {
+      this.log(`\n ${chalk.green('✔')} Successfully restored.`);
+    }
   }
 }

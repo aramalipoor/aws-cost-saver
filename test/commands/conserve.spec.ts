@@ -1,8 +1,7 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { Config } from '@oclif/config';
-
-import { mockSpecificMethods } from '../util';
+import { mockProcessStdout } from 'jest-mock-process';
 
 jest.mock('fs');
 import fs from 'fs';
@@ -16,13 +15,10 @@ import { StopRdsDatabaseInstancesTrick } from '../../src/tricks/stop-rds-databas
 import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../../src/tricks/decrease-dynamodb-provisioned-rcu-wcu.trick';
 import { ShutdownEC2InstancesTrick } from '../../src/tricks/shutdown-ec2-instances.trick';
 
-const MockedConserve = mockSpecificMethods(Conserve, 'log');
-const mockedLog = MockedConserve.prototype.log;
-
 async function runConserve(argv: string[]) {
   const config = new Config({ root: '../../src', ignoreManifest: true });
   config.bin = 'test';
-  await MockedConserve.run(argv, config);
+  await Conserve.run(argv, config);
 }
 
 beforeAll(async done => {
@@ -47,6 +43,8 @@ beforeEach(async () => {
 });
 
 describe('conserve', () => {
+  const mockStdout = mockProcessStdout();
+
   it('ignores default tricks', async () => {
     AWSMock.setSDKInstance(AWS);
 
@@ -239,17 +237,16 @@ describe('conserve', () => {
 
     jest.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
 
-    await runConserve([
-      '--no-default-tricks',
-      '-u',
-      'decrease-dynamodb-provisioned-rcu-wcu',
-      '-u',
-      'stop-rds-database-instances',
-    ]);
+    await expect(async () =>
+      runConserve([
+        '--no-default-tricks',
+        '-u',
+        'decrease-dynamodb-provisioned-rcu-wcu',
+        '-u',
+        'stop-rds-database-instances',
+      ]),
+    ).rejects.toThrowError('ConservePartialFailure');
 
-    expect(mockedLog).toHaveBeenCalledWith(
-      expect.stringMatching(/partially conserved/gi),
-    );
     expect(updateTableSpy).toHaveBeenCalledTimes(1);
     expect(stopDBInstanceSpy).toHaveBeenCalledTimes(1);
     expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
@@ -345,45 +342,15 @@ describe('conserve', () => {
 
     jest.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
 
-    await runConserve([
-      '--no-default-tricks',
-      '-u',
-      'decrease-dynamodb-provisioned-rcu-wcu',
-      '-u',
-      'stop-rds-database-instances',
-    ]);
-
-    expect(mockedLog).toHaveBeenCalledWith(
-      expect.stringMatching(/All .* tricks failed/gi),
-    );
-    expect(updateTableSpy).toHaveBeenCalledTimes(1);
-    expect(stopDBInstanceSpy).toHaveBeenCalledTimes(1);
-    expect(fs.writeFileSync).toHaveBeenCalledTimes(1);
-
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      'aws-cost-saver.json',
-      JSON.stringify(
-        {
-          'decrease-dynamodb-provisioned-rcu-wcu': [
-            {
-              name: 'foo',
-              provisionedThroughput: true,
-              rcu: 17,
-              wcu: 15,
-            },
-          ],
-          'stop-rds-database-instances': [
-            {
-              identifier: 'bar',
-              status: 'available',
-            },
-          ],
-        },
-        null,
-        2,
-      ),
-      expect.any(String),
-    );
+    await expect(async () =>
+      runConserve([
+        '--no-default-tricks',
+        '-u',
+        'decrease-dynamodb-provisioned-rcu-wcu',
+        '-u',
+        'stop-rds-database-instances',
+      ]),
+    ).rejects.toThrowError('ConserveFailure');
 
     AWSMock.restore('DynamoDB');
     AWSMock.restore('RDS');
@@ -536,6 +503,7 @@ describe('conserve', () => {
     );
 
     AWSMock.restore('DynamoDB');
+    AWSMock.restore('RDS');
   });
 
   it('fails if trick name is invalid', async () => {
@@ -633,6 +601,65 @@ describe('conserve', () => {
     ]);
 
     expect(fs.writeFileSync).toHaveBeenCalled();
+
+    AWSMock.restore('DynamoDB');
+  });
+
+  it('uses silent renderer if only-summary flag is passed', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'listTables',
+      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
+        callback(null, { TableNames: ['foo'] });
+      },
+    );
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 15,
+                ReadCapacityUnits: 17,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
+    const updateTableSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+
+    AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
+
+    jest.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
+
+    await runConserve([
+      '--dry-run',
+      '--only-summary',
+      '--no-default-tricks',
+      '-u',
+      'decrease-dynamodb-provisioned-rcu-wcu',
+    ]);
+
+    expect(mockStdout).toHaveBeenCalledWith(
+      expect.stringMatching(/running in the background/gi),
+    );
+    expect(mockStdout).not.toHaveBeenCalledWith(
+      expect.stringMatching(/conserve resources/gi),
+    );
 
     AWSMock.restore('DynamoDB');
   });

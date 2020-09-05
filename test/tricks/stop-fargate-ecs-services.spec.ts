@@ -1,12 +1,13 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
-
-import { ListrTaskWrapper } from 'listr';
+import { mockProcessStdout } from 'jest-mock-process';
+import { ListrTaskWrapper } from 'listr2';
 
 import {
   StopFargateEcsServicesTrick,
   StopFargateEcsServicesState,
 } from '../../src/tricks/stop-fargate-ecs-services.trick';
+import { createMockTask } from '../util';
 
 beforeAll(async done => {
   // AWSMock cannot mock waiters at the moment
@@ -14,20 +15,15 @@ beforeAll(async done => {
     promise: jest.fn(),
   }));
 
+  mockProcessStdout();
   done();
 });
 
 describe('stop-fargate-ecs-services', () => {
-  let task: ListrTaskWrapper;
+  let task: ListrTaskWrapper<any, any>;
 
   beforeEach(() => {
-    task = {
-      title: '',
-      output: '',
-      run: jest.fn(),
-      skip: jest.fn(),
-      report: jest.fn(),
-    };
+    task = createMockTask();
   });
 
   it('returns correct machine name', async () => {
@@ -35,11 +31,6 @@ describe('stop-fargate-ecs-services', () => {
     expect(instance.getMachineName()).toBe(
       StopFargateEcsServicesTrick.machineName,
     );
-  });
-
-  it('returns different title for conserve and restore commands', async () => {
-    const instance = new StopFargateEcsServicesTrick();
-    expect(instance.getConserveTitle()).not.toBe(instance.getRestoreTitle());
   });
 
   it('returns an empty Listr if no clusters found', async () => {
@@ -102,7 +93,7 @@ describe('stop-fargate-ecs-services', () => {
     const stateListr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    stateListr.setRenderer('silent');
+
     await stateListr.run();
 
     expect(stateObject.length).toBe(2);
@@ -158,8 +149,18 @@ describe('stop-fargate-ecs-services', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
-    await expect(async () => listr.run()).rejects.toThrow();
+
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/unexpected/gi),
+          }),
+        ],
+      }),
+    ]);
 
     AWSMock.restore('ECS');
   });
@@ -291,7 +292,6 @@ describe('stop-fargate-ecs-services', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject).toStrictEqual([
@@ -391,7 +391,7 @@ describe('stop-fargate-ecs-services', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateServiceSpy).toBeCalledWith(
@@ -440,7 +440,7 @@ describe('stop-fargate-ecs-services', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateServiceSpy).not.toBeCalled();
@@ -479,7 +479,7 @@ describe('stop-fargate-ecs-services', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateServiceSpy).not.toBeCalled();
@@ -532,7 +532,7 @@ describe('stop-fargate-ecs-services', () => {
     const conserveListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateServiceSpy).toBeCalledWith(
@@ -582,7 +582,7 @@ describe('stop-fargate-ecs-services', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateServiceSpy).not.toBeCalled();
@@ -626,7 +626,7 @@ describe('stop-fargate-ecs-services', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateServiceSpy).not.toBeCalled();

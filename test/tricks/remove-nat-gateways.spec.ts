@@ -1,13 +1,14 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
-
-import { ListrTaskWrapper } from 'listr';
+import { mockProcessStdout } from 'jest-mock-process';
+import { ListrTaskWrapper } from 'listr2';
 
 import {
   RemoveNatGatewaysTrick,
   RemoveNatGatewaysState,
 } from '../../src/tricks/remove-nat-gateways.trick';
 import { NatGatewayState } from '../../src/states/nat-gateway.state';
+import { createMockTask } from '../util';
 
 beforeAll(async done => {
   // AWSMock cannot mock waiters at the moment
@@ -15,30 +16,20 @@ beforeAll(async done => {
     promise: jest.fn(),
   }));
 
+  mockProcessStdout();
   done();
 });
 
 describe('remove-nat-gateways', () => {
-  let task: ListrTaskWrapper;
+  let task: ListrTaskWrapper<any, any>;
 
   beforeEach(() => {
-    task = {
-      title: '',
-      output: '',
-      run: jest.fn(),
-      skip: jest.fn(),
-      report: jest.fn(),
-    };
+    task = createMockTask();
   });
 
   it('returns correct machine name', async () => {
     const instance = new RemoveNatGatewaysTrick();
     expect(instance.getMachineName()).toBe(RemoveNatGatewaysTrick.machineName);
-  });
-
-  it('returns different title for conserve and restore commands', async () => {
-    const instance = new RemoveNatGatewaysTrick();
-    expect(instance.getConserveTitle()).not.toBe(instance.getRestoreTitle());
   });
 
   it('returns an empty Listr if no NAT gateway is found', async () => {
@@ -112,30 +103,45 @@ describe('remove-nat-gateways', () => {
         } as AWS.EC2.Types.DescribeNatGatewaysResult);
       },
     );
+    AWSMock.mock(
+      'EC2',
+      'describeRouteTables',
+      (
+        params: AWS.EC2.Types.DescribeRouteTablesRequest,
+        callback: Function,
+      ) => {
+        callback(null, {
+          RouteTables: [],
+        } as AWS.EC2.Types.DescribeRouteTablesResult);
+      },
+    );
 
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
 
-    await expect(async () => listr.run()).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          message: expect.stringMatching(/unexpected values/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/unexpected values/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/unexpected values/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/unexpected values/gi),
-        }),
-      ]),
-    });
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/unexpected/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/unexpected/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/unexpected/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/unexpected/gi),
+          }),
+        ],
+      }),
+    ]);
 
     AWSMock.restore('EC2');
   });
@@ -160,6 +166,14 @@ describe('remove-nat-gateways', () => {
               State: 'available',
               Tags: [{ Key: 'Team', Value: 'Tacos' }],
             },
+            {
+              NatGatewayId: 'foosec',
+              VpcId: 'barex',
+              SubnetId: 'baza',
+              NatGatewayAddresses: [{ AllocationId: 'quxoo' }],
+              State: 'available',
+              Tags: [{ Key: 'Team', Value: 'Tacos' }],
+            },
           ],
         } as AWS.EC2.Types.DescribeNatGatewaysResult);
       },
@@ -176,7 +190,7 @@ describe('remove-nat-gateways', () => {
             {
               RouteTableId: 'quuz',
               Routes: [
-                { DestinationCidrBlock: '1.1.0.0/0', NatGatewayId: 'barex' },
+                { DestinationCidrBlock: '1.1.0.0/0', NatGatewayId: 'foosec' },
               ],
             },
             {
@@ -203,6 +217,10 @@ describe('remove-nat-gateways', () => {
                 },
               ],
             },
+            {
+              RouteTableId: 'mayba',
+              Routes: [],
+            },
           ],
         } as AWS.EC2.Types.DescribeRouteTablesResult);
       },
@@ -214,8 +232,17 @@ describe('remove-nat-gateways', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
+
+    expect(stateObject.pop()).toMatchObject({
+      id: 'foosec',
+      vpcId: 'barex',
+      subnetId: 'baza',
+      allocationIds: ['quxoo'],
+      state: 'available',
+      routes: [{ routeTableId: 'quuz', destinationCidr: '1.1.0.0/0' }],
+      tags: [{ Key: 'Team', Value: 'Tacos' }],
+    } as NatGatewayState);
 
     expect(stateObject.pop()).toMatchObject({
       id: 'foo',
@@ -259,7 +286,7 @@ describe('remove-nat-gateways', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(deleteNatGatewaySpy).toBeCalledWith(
@@ -298,7 +325,7 @@ describe('remove-nat-gateways', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(deleteNatGatewaySpy).not.toBeCalled();
@@ -332,7 +359,7 @@ describe('remove-nat-gateways', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(deleteNatGatewaySpy).not.toBeCalled();
@@ -377,7 +404,7 @@ describe('remove-nat-gateways', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createNatGatewaySpy).toBeCalledWith(
@@ -447,7 +474,7 @@ describe('remove-nat-gateways', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createNatGatewaySpy).not.toBeCalled();
@@ -481,7 +508,7 @@ describe('remove-nat-gateways', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createNatGatewaySpy).not.toBeCalled();

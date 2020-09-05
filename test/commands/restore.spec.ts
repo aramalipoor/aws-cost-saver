@@ -1,8 +1,7 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { Config } from '@oclif/config';
-
-import { mockSpecificMethods } from '../util';
+import { mockProcessStdout } from 'jest-mock-process';
 
 jest.mock('fs');
 import fs from 'fs';
@@ -11,13 +10,10 @@ import { configureAWS } from '../../src/configure-aws';
 
 import Restore from '../../src/commands/restore';
 
-const MockedRestore = mockSpecificMethods(Restore, 'log');
-const mockedLog = MockedRestore.prototype.log;
-
 async function runRestore(argv: string[]) {
   const config = new Config({ root: '../../src', ignoreManifest: true });
   config.bin = 'test';
-  await MockedRestore.run(argv, config);
+  await Restore.run(argv, config);
 }
 
 beforeAll(async done => {
@@ -39,6 +35,8 @@ beforeEach(async () => {
 });
 
 describe('conserve', () => {
+  mockProcessStdout();
+
   it('restores resources from state-file', async () => {
     AWSMock.setSDKInstance(AWS);
 
@@ -159,11 +157,10 @@ describe('conserve', () => {
       ),
     );
 
-    await runRestore([]);
-
-    expect(mockedLog).toHaveBeenCalledWith(
-      expect.stringMatching(/partially restored/gi),
+    await expect(async () => runRestore([])).rejects.toThrowError(
+      'RestorePartialFailure',
     );
+
     expect(updateTableSpy).toHaveBeenCalledTimes(1);
     expect(startDBInstanceSpy).toHaveBeenCalledTimes(1);
 

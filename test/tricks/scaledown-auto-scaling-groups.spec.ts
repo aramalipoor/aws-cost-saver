@@ -1,29 +1,25 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
-
-import { ListrTaskWrapper } from 'listr';
+import { mockProcessStdout } from 'jest-mock-process';
+import { ListrTaskWrapper } from 'listr2';
 
 import {
   ScaledownAutoScalingGroupsTrick,
   ScaledownAutoScalingGroupsState,
 } from '../../src/tricks/scaledown-auto-scaling-groups.trick';
 import { AutoScalingGroupState } from '../../src/states/auto-scaling-group.state';
+import { createMockTask } from '../util';
 
 beforeAll(async done => {
+  mockProcessStdout();
   done();
 });
 
 describe('scaledown-auto-scaling-groups', () => {
-  let task: ListrTaskWrapper;
+  let task: ListrTaskWrapper<any, any>;
 
   beforeEach(() => {
-    task = {
-      title: '',
-      output: '',
-      run: jest.fn(),
-      skip: jest.fn(),
-      report: jest.fn(),
-    };
+    task = createMockTask();
   });
 
   it('returns correct machine name', async () => {
@@ -31,11 +27,6 @@ describe('scaledown-auto-scaling-groups', () => {
     expect(instance.getMachineName()).toBe(
       ScaledownAutoScalingGroupsTrick.machineName,
     );
-  });
-
-  it('returns different title for conserve and restore commands', async () => {
-    const instance = new ScaledownAutoScalingGroupsTrick();
-    expect(instance.getConserveTitle()).not.toBe(instance.getRestoreTitle());
   });
 
   it('returns an empty state object if no ASG found', async () => {
@@ -134,7 +125,7 @@ describe('scaledown-auto-scaling-groups', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateAutoScalingGroupSpy).toBeCalledWith(
@@ -204,7 +195,7 @@ describe('scaledown-auto-scaling-groups', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(updateAutoScalingGroupSpy).not.toBeCalled();
@@ -238,7 +229,7 @@ describe('scaledown-auto-scaling-groups', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateAutoScalingGroupSpy).toBeCalledWith(
@@ -308,7 +299,7 @@ describe('scaledown-auto-scaling-groups', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(updateAutoScalingGroupSpy).not.toBeCalled();

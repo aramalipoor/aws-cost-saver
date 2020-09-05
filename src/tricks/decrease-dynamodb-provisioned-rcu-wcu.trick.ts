@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
+import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -23,29 +23,23 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     return DecreaseDynamoDBProvisionedRcuWcuTrick.machineName;
   }
 
-  getConserveTitle(): string {
-    return 'Decrease DynamoDB Provisioned RCU and WCU';
-  }
-
-  getRestoreTitle(): string {
-    return 'Restore DynamoDB Provisioned RCU and WCU';
-  }
-
   async getCurrentState(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: DecreaseDynamoDBProvisionedRcuWcuState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const tableNames = await this.listTableNames(task);
 
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (!tableNames || tableNames.length === 0) {
-      task.skip('No DynamoDB tables found');
+      task.skip(chalk.dim('no DynamoDB tables found'));
       return subListr;
     }
 
@@ -59,6 +53,9 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
           return {
             title: tableName,
             task: async (ctx, task) => this.getTableState(task, tableState),
+            options: {
+              persistentOutput: true,
+            },
           };
         },
       ),
@@ -68,64 +65,70 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   }
 
   async conserve(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: DecreaseDynamoDBProvisionedRcuWcuState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: { collapse: true },
+    });
 
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
-          title: `${chalk.blueBright(table.name)}`,
+          title: `${chalk.greenBright(table.name)}`,
           task: (ctx, task) =>
             this.conserveTableProvisionedRcuWcu(task, table, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No DynamoDB tables found`);
+      task.skip(chalk.dim(`no DynamoDB tables found`));
     }
 
     return subListr;
   }
 
   async restore(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: DecreaseDynamoDBProvisionedRcuWcuState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: { collapse: true },
+    });
 
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
-          title: `${chalk.blueBright(table.name)}`,
+          title: `${chalk.greenBright(table.name)}`,
           task: (ctx, task) =>
             this.restoreTableProvisionedRcuWcu(task, table, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No DynamoDB tables was conserved`);
+      task.skip(chalk.dim(`no DynamoDB tables was conserved`));
     }
 
     return subListr;
   }
 
   private async listTableNames(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
   ): Promise<AWS.DynamoDB.TableNameList> {
     const tableNames: string[] = [];
 
     // TODO Add logic to go through all pages
-    task.output = 'Fetching page 1...';
+    task.output = 'fetching page 1...';
     tableNames.push(
       ...((await this.ddbClient.listTables({ Limit: 100 }).promise())
         .TableNames || []),
@@ -135,15 +138,15 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   }
 
   private async getTableState(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     tableState: DynamoDBTableState,
   ): Promise<void> {
-    task.output = 'Fetching table information...';
-    const provisionedThroughput = (
+    task.output = 'fetching table information...';
+    const provisionedThroughput = ((
       await this.ddbClient
         .describeTable({ TableName: tableState.name })
         .promise()
-    ).Table?.ProvisionedThroughput;
+    ).Table as AWS.DynamoDB.TableDescription).ProvisionedThroughput;
 
     if (!provisionedThroughput) {
       tableState.provisionedThroughput = false;
@@ -151,31 +154,33 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     }
 
     tableState.provisionedThroughput = true;
-    tableState.rcu = provisionedThroughput.ReadCapacityUnits || 1;
-    tableState.wcu = provisionedThroughput.WriteCapacityUnits || 1;
+    tableState.rcu = provisionedThroughput.ReadCapacityUnits as number;
+    tableState.wcu = provisionedThroughput.WriteCapacityUnits as number;
+
+    task.output = 'done';
   }
 
   private async conserveTableProvisionedRcuWcu(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     tableState: DynamoDBTableState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (!tableState.provisionedThroughput) {
-      task.skip(`Provisioned throughput is not configured`);
+      task.skip(chalk.dim(`provisioned throughput is not configured`));
       return;
     }
 
     if (tableState.wcu < 2 && tableState.rcu < 2) {
-      task.skip(`Provisioned RCU/WCU is already at minimum of 1`);
+      task.skip(chalk.dim(`provisioned RCU/WCU is already at minimum of 1`));
       return;
     }
 
     if (options.dryRun) {
-      task.skip('Skipped, would configure RCU = 1 WCU = 1');
+      task.skip(chalk.dim('skipped, would configure RCU = 1 WCU = 1'));
       return;
     }
 
-    task.output = `Configuring RCU = 1 WCU = 1 ...`;
+    task.output = `configuring RCU = 1 WCU = 1 ...`;
     await this.ddbClient
       .updateTable({
         TableName: tableState.name,
@@ -186,34 +191,38 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
       })
       .promise();
 
-    task.output = `Configured RCU = 1 WCU = 1`;
+    task.output = `configured RCU = 1 WCU = 1`;
   }
 
   private async restoreTableProvisionedRcuWcu(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     tableState: DynamoDBTableState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (!tableState.provisionedThroughput) {
-      task.skip(`Provisioned throughput was not configured`);
+      task.skip(chalk.dim(`provisioned throughput was not configured`));
       return;
     }
 
     if (options.dryRun) {
       task.skip(
-        `Skipped, would configure RCU = ${tableState.rcu} WCU = ${tableState.wcu}`,
+        chalk.dim(
+          `skipped, would configure RCU = ${tableState.rcu} WCU = ${tableState.wcu}`,
+        ),
       );
       return;
     }
 
     if (!tableState.rcu || !tableState.wcu) {
       task.skip(
-        `Skipped, RCU = ${tableState.rcu} WCU = ${tableState.wcu} are not configured correctly`,
+        chalk.dim(
+          `skipped, RCU = ${tableState.rcu} WCU = ${tableState.wcu} are not configured correctly`,
+        ),
       );
       return;
     }
 
-    task.output = `Configuring ${tableState.rcu} WCU = ${tableState.wcu} ...`;
+    task.output = `configuring ${tableState.rcu} WCU = ${tableState.wcu} ...`;
     await this.ddbClient
       .updateTable({
         TableName: tableState.name,
@@ -224,6 +233,6 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
       })
       .promise();
 
-    task.output = `Configured RCU = ${tableState.rcu} WCU = ${tableState.wcu}`;
+    task.output = `configured RCU = ${tableState.rcu} WCU = ${tableState.wcu}`;
   }
 }

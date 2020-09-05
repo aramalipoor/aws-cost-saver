@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
-import Listr, { ListrOptions, ListrTaskWrapper } from 'listr';
 import chalk from 'chalk';
+import { Listr, ListrTaskWrapper } from 'listr2';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -23,23 +23,15 @@ export class SuspendAutoScalingGroupsTrick
     return SuspendAutoScalingGroupsTrick.machineName;
   }
 
-  getConserveTitle(): string {
-    return 'Suspend Auto Scaling Groups';
-  }
-
-  getRestoreTitle(): string {
-    return 'Resume Auto Scaling Groups';
-  }
-
   async getCurrentState(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: SuspendAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     const scalingGroups = await this.listAutoScalingGroups(task);
 
     if (!scalingGroups || scalingGroups.length === 0) {
-      task.skip('No ASG found');
+      task.skip(chalk.dim('No ASG found'));
       return;
     }
 
@@ -55,62 +47,72 @@ export class SuspendAutoScalingGroupsTrick
   }
 
   async conserve(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: SuspendAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (currentState && currentState.length > 0) {
       for (const asgState of currentState) {
         subListr.add({
-          title: chalk.blueBright(`${asgState.name}`),
+          title: chalk.greenBright(`${asgState.name}`),
           task: (ctx, task) => this.conserveProcesses(task, asgState, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No auto scaling groups found`);
+      task.skip(chalk.dim(`no auto scaling groups found`));
     }
 
     return subListr;
   }
 
   async restore(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     originalState: SuspendAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (originalState && originalState.length > 0) {
       for (const asgState of originalState) {
         subListr.add({
-          title: chalk.blueBright(`${asgState.name}`),
+          title: chalk.greenBright(`${asgState.name}`),
           task: (ctx, task) => this.restoreProcesses(task, asgState, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No auto scaling groups were conserved`);
+      task.skip(chalk.dim(`no auto scaling groups were conserved`));
     }
 
     return subListr;
   }
 
   private async listAutoScalingGroups(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
   ): Promise<AWS.AutoScaling.AutoScalingGroups> {
     const groups: AWS.AutoScaling.AutoScalingGroups = [];
 
     // TODO Add logic to go through all pages
-    task.output = 'Fetching page 1...';
+    task.output = 'fetching page 1...';
     groups.push(
       ...(
         await this.asClient
@@ -119,40 +121,41 @@ export class SuspendAutoScalingGroupsTrick
       ).AutoScalingGroups,
     );
 
+    task.output = 'done';
     return groups;
   }
 
   private async conserveProcesses(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     asgState: AutoScalingGroupState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (options.dryRun) {
-      task.skip('Skipped, would suspend ASG processes');
+      task.skip(chalk.dim('skipped, would suspend ASG processes'));
       return;
     }
 
-    task.output = 'Suspending ASG processes...';
+    task.output = 'suspending ASG processes...';
     await this.asClient
       .suspendProcesses({
         AutoScalingGroupName: asgState.name,
       })
       .promise();
 
-    task.output = 'Suspended';
+    task.output = 'suspended';
   }
 
   private async restoreProcesses(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     asgState: AutoScalingGroupState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (options.dryRun) {
-      task.skip(`Skipped, would resume ASG processes`);
+      task.skip(chalk.dim(`skipped, would resume ASG processes`));
       return;
     }
 
-    task.output = 'Resuming ASG...';
+    task.output = 'resuming ASG...';
     await this.asClient
       .resumeProcesses({
         AutoScalingGroupName: asgState.name,

@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
+import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -9,7 +9,6 @@ import {
   NatGatewayRouteState,
   NatGatewayState,
 } from '../states/nat-gateway.state';
-import { RouteTableList } from 'aws-sdk/clients/ec2';
 
 export type RemoveNatGatewaysState = NatGatewayState[];
 
@@ -29,27 +28,29 @@ export class RemoveNatGatewaysTrick
     return RemoveNatGatewaysTrick.machineName;
   }
 
-  getConserveTitle(): string {
-    return 'Remove NAT Gateways';
-  }
-
-  getRestoreTitle(): string {
-    return 'Recreate NAT Gateways';
-  }
-
   async getCurrentState(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: RemoveNatGatewaysState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const natGateways = await this.listNatGateways(task);
 
-    const subListr = new Listr({
-      concurrent: false,
+    const subListr = task.newListr([], {
+      concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
+    if (natGateways.length === 0) {
+      return subListr;
+    }
+
+    task.output = 'fetching all routes...';
+    await this.getAllRouteTables();
+
+    task.output = 'fetching NAT gateways...';
     subListr.add(
       natGateways.map(
         (natGateway): ListrTask => {
@@ -70,7 +71,7 @@ export class RemoveNatGatewaysTrick
                 );
               }
 
-              task.output = 'Finding routes...';
+              task.output = 'finding routes...';
               const routes = await this.findRoutes(natGateway);
 
               currentState.push({
@@ -85,31 +86,40 @@ export class RemoveNatGatewaysTrick
                 tags: natGateway.Tags as AWS.EC2.TagList,
               });
             },
+            options: {
+              persistentOutput: true,
+            },
           };
         },
       ),
     );
 
+    task.output = 'done';
     return subListr;
   }
 
   async conserve(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: RemoveNatGatewaysState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 1,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     for (const natGateway of currentState) {
       subListr.add({
-        title: chalk.blueBright(
+        title: chalk.greenBright(
           `${natGateway.id} / ${RemoveNatGatewaysTrick.getNameTag(natGateway)}`,
         ),
         task: (ctx, task) => this.conserveNatGateway(task, natGateway, options),
+        options: {
+          persistentOutput: true,
+        },
       });
     }
 
@@ -117,20 +127,25 @@ export class RemoveNatGatewaysTrick
   }
 
   async restore(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     originalState: RemoveNatGatewaysState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 1,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     for (const natGateway of originalState) {
       subListr.add({
-        title: chalk.blueBright(natGateway.id),
+        title: chalk.greenBright(natGateway.id),
         task: (ctx, task) => this.restoreNatGateway(task, natGateway, options),
+        options: {
+          persistentOutput: true,
+        },
       });
     }
 
@@ -138,34 +153,36 @@ export class RemoveNatGatewaysTrick
   }
 
   private async conserveNatGateway(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     natGateway: NatGatewayState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (natGateway.state !== 'available') {
       task.skip(
-        `Skipped, state is not "available", it is "${natGateway.state}" instead`,
+        chalk.dim(
+          `skipped, state is not "available", it is "${natGateway.state}" instead`,
+        ),
       );
       return;
     }
 
     if (options.dryRun) {
-      task.skip(`Skipped, would remove NAT Gateway`);
+      task.skip(chalk.dim(`skipped, would remove NAT Gateway`));
       return;
     }
 
-    task.output = 'Deleting NAT gateway...';
+    task.output = 'deleting NAT gateway...';
     await this.ec2Client
       .deleteNatGateway({
         NatGatewayId: natGateway.id,
       })
       .promise();
 
-    task.output = 'NAT Gateway Deleted';
+    task.output = 'NAT Gateway deleted';
   }
 
   private async restoreNatGateway(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     natGateway: NatGatewayState,
     options: TrickOptionsInterface,
   ): Promise<void> {
@@ -174,19 +191,23 @@ export class RemoveNatGatewaysTrick
 
     if (natGateway.state !== 'available') {
       task.skip(
-        `Skipped, state was not "available", it was "${natGateway.state}" instead`,
+        chalk.dim(
+          `skipped, state was not "available", it was "${natGateway.state}" instead`,
+        ),
       );
       return;
     }
 
     if (options.dryRun) {
       task.skip(
-        `Skipped, would create NAT Gateway on subnet = ${natGateway.subnetId} and allocate EIP = ${allocationId}`,
+        chalk.dim(
+          `skipped, would create NAT Gateway on subnet = ${natGateway.subnetId} and allocate EIP = ${allocationId}`,
+        ),
       );
       return;
     }
 
-    task.output = 'Creating NAT gateway...';
+    task.output = 'creating NAT gateway...';
     const result = await this.ec2Client
       .createNatGateway({
         AllocationId: allocationId,
@@ -202,7 +223,7 @@ export class RemoveNatGatewaysTrick
     const newNatGatewayId = (result.NatGateway as AWS.EC2.NatGateway)
       .NatGatewayId as string;
 
-    task.output = 'Waiting for NAT Gateway to be available...';
+    task.output = 'waiting for NAT Gateway to be available...';
     await this.ec2Client
       .waitFor('natGatewayAvailable', {
         NatGatewayIds: [newNatGatewayId],
@@ -228,18 +249,19 @@ export class RemoveNatGatewaysTrick
   }
 
   private async listNatGateways(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
   ): Promise<AWS.EC2.NatGatewayList> {
     const natGateways: AWS.EC2.NatGatewayList = [];
 
     // TODO Add logic to go through all pages
-    task.output = 'Fetching page 1...';
+    task.output = 'fetching page 1...';
     natGateways.push(
       ...((
         await this.ec2Client.describeNatGateways({ MaxResults: 10 }).promise()
       ).NatGateways as AWS.EC2.NatGatewayList),
     );
 
+    task.output = 'done';
     return natGateways;
   }
 

@@ -1,6 +1,6 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
-import Listr, { ListrOptions, ListrTask, ListrTaskWrapper } from 'listr';
+import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
 
 import { TrickInterface } from '../interfaces/trick.interface';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
@@ -23,29 +23,23 @@ export class SnapshotRemoveElasticacheRedisTrick
     return SnapshotRemoveElasticacheRedisTrick.machineName;
   }
 
-  getConserveTitle(): string {
-    return 'Snapshot and Remove ElastiCache Redis Clusters';
-  }
-
-  getRestoreTitle(): string {
-    return 'Recreate ElastiCache Redis Clusters from Snapshot';
-  }
-
   async getCurrentState(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: SnapshotRemoveElasticacheRedisState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const replicationGroups = await this.listReplicationGroups(task);
 
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (!replicationGroups || replicationGroups.length === 0) {
-      task.skip('No ElastiCache Redis clusters found');
+      task.skip(chalk.dim('No ElastiCache Redis clusters found'));
       return subListr;
     }
 
@@ -74,6 +68,9 @@ export class SnapshotRemoveElasticacheRedisTrick
                 replicationGroup,
               );
             },
+            options: {
+              persistentOutput: true,
+            },
           };
         },
       ),
@@ -83,75 +80,87 @@ export class SnapshotRemoveElasticacheRedisTrick
   }
 
   async conserve(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     currentState: SnapshotRemoveElasticacheRedisState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (currentState && currentState.length > 0) {
       for (const replicationGroup of currentState) {
         subListr.add({
-          title: chalk.blueBright(replicationGroup.id),
+          title: chalk.greenBright(replicationGroup.id),
           task: (ctx, task) =>
             this.conserveReplicationGroup(task, replicationGroup, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No ElastiCache Redis clusters found`);
+      task.skip(chalk.dim(`no ElastiCache Redis clusters found`));
     }
 
     return subListr;
   }
 
   async restore(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     originalState: SnapshotRemoveElasticacheRedisState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const subListr = new Listr({
+    const subListr = task.newListr([], {
       concurrent: 10,
       exitOnError: false,
-      collapse: false,
-    } as ListrOptions);
+      rendererOptions: {
+        collapse: true,
+      },
+    });
 
     if (originalState && originalState.length > 0) {
       for (const replicationGroup of originalState) {
         subListr.add({
-          title: chalk.blueBright(replicationGroup.id),
+          title: chalk.greenBright(replicationGroup.id),
           task: (ctx, task) =>
             this.restoreReplicationGroup(task, replicationGroup, options),
+          options: {
+            persistentOutput: true,
+          },
         });
       }
     } else {
-      task.skip(`No ElastiCache Redis clusters found`);
+      task.skip(chalk.dim(`no ElastiCache Redis clusters found`));
     }
 
     return subListr;
   }
 
   private async conserveReplicationGroup(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     replicationGroupState: ElasticacheReplicationGroupState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     if (replicationGroupState.status !== 'available') {
       task.skip(
-        `Skipped, current state is not "available" it is "${replicationGroupState.status}" instead`,
+        chalk.dim(
+          `skipped, current state is not "available" it is "${replicationGroupState.status}" instead`,
+        ),
       );
       return;
     }
 
     if (options.dryRun) {
-      task.skip('Skipped, would take a snapshot and delete');
+      task.skip(chalk.dim('skipped, would take a snapshot and delete'));
       return;
     }
 
-    task.output = 'Taking a snapshot and deleting replication group...';
+    task.output = 'taking a snapshot and deleting replication group...';
     await this.elcClient
       .deleteReplicationGroup({
         ReplicationGroupId: replicationGroupState.id,
@@ -175,7 +184,7 @@ export class SnapshotRemoveElasticacheRedisTrick
   }
 
   private async restoreReplicationGroup(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     replicationGroupState: ElasticacheReplicationGroupState,
     options: TrickOptionsInterface,
   ): Promise<void> {
@@ -189,19 +198,23 @@ export class SnapshotRemoveElasticacheRedisTrick
 
     if (replicationGroupState.status !== 'available') {
       task.skip(
-        `Skipped, previous state was not "available" it was "${replicationGroupState.status}" instead`,
+        chalk.dim(
+          `skipped, previous state was not "available" it was "${replicationGroupState.status}" instead`,
+        ),
       );
       return;
     }
 
     if (await this.doesReplicationGroupExist(replicationGroupState)) {
-      task.skip('ElastiCache redis cluster already exists');
+      task.skip(chalk.dim('ElastiCache redis cluster already exists'));
       return;
     }
 
     if (options.dryRun) {
       task.skip(
-        `Skipped, would re-create the cluster and remove the snapshot ${replicationGroupState.snapshotName}`,
+        chalk.dim(
+          `skipped, would re-create the cluster and remove the snapshot ${replicationGroupState.snapshotName}`,
+        ),
       );
       return;
     }
@@ -229,11 +242,11 @@ export class SnapshotRemoveElasticacheRedisTrick
       })
       .promise();
 
-    task.output = 'Restored successfully';
+    task.output = 'restored successfully';
   }
 
   private async getReplicationGroupState(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
     replicationGroupState: ElasticacheReplicationGroupState,
     replicationGroup: AWS.ElastiCache.ReplicationGroup,
   ): Promise<void> {
@@ -266,7 +279,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       );
     }
 
-    task.output = 'Fetching a sample cache cluster...';
+    task.output = 'fetching a sample cache cluster...';
     const sampleCacheCluster = await this.describeCacheCluster(
       replicationGroup.MemberClusters[0],
     );
@@ -275,7 +288,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       throw new Error(`Could not find sample cache cluster`);
     }
 
-    task.output = 'Preparing re-create params...';
+    task.output = 'preparing re-create params...';
     const snapshotName = SnapshotRemoveElasticacheRedisTrick.generateSnapshotName(
       replicationGroup,
     );
@@ -290,6 +303,8 @@ export class SnapshotRemoveElasticacheRedisTrick
     replicationGroupState.snapshotName = snapshotName;
     replicationGroupState.status = replicationGroup.Status;
     replicationGroupState.createParams = createParams;
+
+    task.output = 'done';
   }
 
   private generateNodeGroupConfigs(
@@ -389,12 +404,12 @@ export class SnapshotRemoveElasticacheRedisTrick
   }
 
   private async listReplicationGroups(
-    task: ListrTaskWrapper,
+    task: ListrTaskWrapper<any, any>,
   ): Promise<AWS.ElastiCache.ReplicationGroupList> {
     const replicationGroups: AWS.ElastiCache.ReplicationGroupList = [];
 
     // TODO Add logic to go through all pages
-    task.output = 'Fetching page 1...';
+    task.output = 'fetching page 1...';
     replicationGroups.push(
       ...((
         await this.elcClient
@@ -403,6 +418,7 @@ export class SnapshotRemoveElasticacheRedisTrick
       ).ReplicationGroups as AWS.ElastiCache.ReplicationGroupList),
     );
 
+    task.output = 'done';
     return replicationGroups;
   }
 

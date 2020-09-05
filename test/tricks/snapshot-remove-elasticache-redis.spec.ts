@@ -1,7 +1,9 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
+import { mockProcessStdout } from 'jest-mock-process';
+import { ListrTaskWrapper } from 'listr2';
 
-import { ListrTaskWrapper } from 'listr';
+import { createMockTask } from '../util';
 
 import {
   SnapshotRemoveElasticacheRedisTrick,
@@ -58,20 +60,15 @@ beforeAll(async done => {
         } as AWS.ElastiCache.TagListMessage),
     }));
 
+  mockProcessStdout();
   done();
 });
 
 describe('snapshot-remove-elasticache-redis', () => {
-  let task: ListrTaskWrapper;
+  let task: ListrTaskWrapper<any, any>;
 
   beforeEach(() => {
-    task = {
-      title: '',
-      output: '',
-      run: jest.fn(),
-      skip: jest.fn(),
-      report: jest.fn(),
-    };
+    task = createMockTask();
   });
 
   it('returns correct machine name', async () => {
@@ -79,11 +76,6 @@ describe('snapshot-remove-elasticache-redis', () => {
     expect(instance.getMachineName()).toBe(
       SnapshotRemoveElasticacheRedisTrick.machineName,
     );
-  });
-
-  it('returns different title for conserve and restore commands', async () => {
-    const instance = new SnapshotRemoveElasticacheRedisTrick();
-    expect(instance.getConserveTitle()).not.toBe(instance.getRestoreTitle());
   });
 
   it('returns an empty Listr if no replication groups found', async () => {
@@ -150,27 +142,30 @@ describe('snapshot-remove-elasticache-redis', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
 
-    await expect(async () => listr.run()).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          message: expect.stringMatching(/ReplicationGroupId is missing/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/ARN is missing/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/Status is missing/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/No member clusters/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/No member clusters/gi),
-        }),
-      ]),
-    });
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/ReplicationGroupId is missing/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/ARN is missing/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/Status is missing/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/No member clusters/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/No member clusters/gi),
+          }),
+        ],
+      }),
+    ]);
 
     AWSMock.restore('ElastiCache');
   });
@@ -204,15 +199,18 @@ describe('snapshot-remove-elasticache-redis', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
 
-    await expect(async () => listr.run()).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          message: expect.stringMatching(/Cannot conserve an AuthToken/gi),
-        }),
-      ]),
-    });
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/Cannot conserve an AuthToken/gi),
+          }),
+        ],
+      }),
+    ]);
 
     AWSMock.restore('ElastiCache');
   });
@@ -264,15 +262,18 @@ describe('snapshot-remove-elasticache-redis', () => {
     const listr = await instance.getCurrentState(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
 
-    await expect(async () => listr.run()).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          message: expect.stringMatching(/Could not find sample/gi),
-        }),
-      ]),
-    });
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/Could not find sample/gi),
+          }),
+        ],
+      }),
+    ]);
 
     AWSMock.restore('ElastiCache');
   });
@@ -343,7 +344,6 @@ describe('snapshot-remove-elasticache-redis', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toStrictEqual(
@@ -452,7 +452,6 @@ describe('snapshot-remove-elasticache-redis', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toStrictEqual(
@@ -560,7 +559,6 @@ describe('snapshot-remove-elasticache-redis', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject.pop()).toStrictEqual(
@@ -672,7 +670,6 @@ describe('snapshot-remove-elasticache-redis', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject).toStrictEqual([
@@ -792,7 +789,6 @@ describe('snapshot-remove-elasticache-redis', () => {
       dryRun: false,
     });
 
-    listr.setRenderer('silent');
     await listr.run({});
 
     expect(stateObject).toStrictEqual([
@@ -856,7 +852,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(deleteReplicationGroupSpy).toBeCalledWith(
@@ -890,7 +886,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(deleteReplicationGroupSpy).not.toBeCalled();
@@ -923,7 +919,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(deleteReplicationGroupSpy).not.toBeCalled();
@@ -953,7 +949,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: true,
     });
-    conserveListr.setRenderer('silent');
+
     await conserveListr.run({});
 
     expect(deleteReplicationGroupSpy).not.toBeCalled();
@@ -1004,7 +1000,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createReplicationGroupSpy).toBeCalledWith(
@@ -1057,7 +1053,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createReplicationGroupSpy).not.toBeCalled();
@@ -1088,7 +1084,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createReplicationGroupSpy).not.toBeCalled();
@@ -1116,7 +1112,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createReplicationGroupSpy).not.toBeCalled();
@@ -1158,7 +1154,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: true,
     });
-    restoreListr.setRenderer('silent');
+
     await restoreListr.run({});
 
     expect(createReplicationGroupSpy).not.toBeCalled();
@@ -1182,17 +1178,20 @@ describe('snapshot-remove-elasticache-redis', () => {
     const listr = await instance.restore(task, stateObject, {
       dryRun: false,
     });
-    listr.setRenderer('silent');
 
-    await expect(async () => listr.run()).rejects.toMatchObject({
-      errors: expect.arrayContaining([
-        expect.objectContaining({
-          message: expect.stringMatching(/snapshotName is missing/gi),
-        }),
-        expect.objectContaining({
-          message: expect.stringMatching(/createParams is missing/gi),
-        }),
-      ]),
-    });
+    await listr.run();
+
+    expect(listr.err).toStrictEqual([
+      expect.objectContaining({
+        errors: [
+          expect.objectContaining({
+            message: expect.stringMatching(/snapshotName is missing/gi),
+          }),
+          expect.objectContaining({
+            message: expect.stringMatching(/createParams is missing/gi),
+          }),
+        ],
+      }),
+    ]);
   });
 });
