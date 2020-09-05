@@ -1,7 +1,7 @@
 {
   "name": "aws-cost-saver",
   "description": "A tiny CLI tool to help save costs in development environments when you're asleep and don't need them!",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "author": "aramalipoor",
   "bin": {
     "aws-cost-saver": "./bin/run"
@@ -39,11 +39,11 @@
     "eslint-plugin-prettier": "^3.1.1",
     "globby": "^10.0.2",
     "jest": "^26.4.2",
+    "jest-mock-process": "^1.4.0",
     "prettier": "^1.19.1",
     "ts-jest": "^26.3.0",
     "ts-node": "^8.10.2",
-    "typescript": "^3.9.7",
-    "jest-mock-process": "^1.4.0"
+    "typescript": "^3.9.7"
   },
   "engines": {
     "node": ">=8.0.0"
