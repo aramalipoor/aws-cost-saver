@@ -6,6 +6,12 @@ aws-cost-saver
 A tiny CLI tool to help save costs in development environments when you're asleep and don't need them!
 
 * [Usage](#usage)
+  * [Commands](#commands)
+    * [`conserve`](#conserve)
+    * [`restore`](#restore)
+  * [State-file](#state-file)
+    * [`AWS S3`](#aws-s3)
+    * [`Local file system`](#local-file-system)
 * [Tricks](#tricks)
   1. [shutdown-ec2-instances](#-shutdown-ec2-instances)
   2. [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
@@ -51,7 +57,7 @@ USAGE
 OPTIONS
   -d, --dry-run                          Only print actions and write state-file of current resources.
   -n, --no-state-file                    Ignore saving current state, useful when want to only conserve as much money as possible.
-  -s, --state-file state-file.json       [default: aws-cost-saver.json] Where to keep original state of stopped/decreased resources to restore later.
+  -s, --state-file state-file.json       [default: file://aws-cost-saver.json] Where to keep original state of stopped/decreased resources to restore later.
   -u, --use-trick trick-machine-name     Enables an individual trick. Useful for tricks that are disabled by default. Can be used multiple times.
   -i, --ignore-trick trick-machine-name  Disables an individual trick. Useful when you do not like to use a specific trick. Can be used multiple times.
   --no-default-tricks                    Disables all default tricks. Useful alongside --use-trick to enable only specific set of tricks.
@@ -75,11 +81,56 @@ USAGE
 
 OPTIONS
   -d, --dry-run          Only list actions and do not actually execute them.
-  -s, --state-file       [default: aws-cost-saver.json] Path to load previous state of your AWS resources from.
+  -s, --state-file       [default: file://aws-cost-saver.json] Path to load previous state of your AWS resources from.
   -r, --region           [default: eu-central-1] AWS region to restore resoruces in.
   -p, --profile          [default: default] AWS profile to lookup from ~/.aws/config
   -m, --only-summary     Do not render live progress. Only print final summary in a clean format.
   -h, --help             Show CLI help.
+```
+
+## State-file
+When resources are conserved their current state (e.g. number of shards, number of instances, etc.) will be saved in a state-file to be to used to restore at a later time.
+
+At the moment when you restore the resources it's up to you to either remove the state-file or save it for a later use.
+
+### Supported storage providers
+aws-cost-saver supports `file:` and `s3:` storage providers.
+
+#### AWS S3
+```sh
+$ aws-cost-saver conserve --dry-run --state-file s3://my-bucket-name/some-dir/aws-cost-saver.json
+```
+#### Local file system
+```sh
+$ aws-cost-saver conserve --dry-run --state-file file://./aws-cost-saver.json
+$ aws-cost-saver conserve --dry-run --state-file file:///etc/aws-cost-saver.json
+
+# Local file system is the default storage
+$ aws-cost-saver conserve --dry-run --state-file ./aws-cost-saver.json
+$ aws-cost-saver conserve --dry-run --state-file /etc/aws-cost-saver.json
+```
+
+#### Keeping an ideal state-file
+One use-case is to keep an ideal state in a state-file (e.g. result of first time you run `conserve`) then always conserve resources without keeping the state and restore from the ideal state-file.
+
+For example on day 1:
+```sh
+# Generate a state-file of current resources:
+aws-cost-saver conserve --dry-run --state-file ideal-state.json
+
+# Manually update numbers if you like:
+vi ideal-state.json
+```
+
+Then the daily routine can look like this:
+```sh
+# In the morning, bring back the ideal state:
+aws-cost-saver restore --state-file ideal-state.json
+
+# ... develop amazing software :D
+
+# At night, conserve as much as possible without keeping the state:
+aws-cost-saver conserve --no-state-file
 ```
 
 # Tricks
