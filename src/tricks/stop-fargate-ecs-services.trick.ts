@@ -135,7 +135,7 @@ export class StopFargateEcsServicesTrick
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const subListr = task.newListr([], {
-      concurrent: 3,
+      concurrent: 10,
       exitOnError: false,
       rendererOptions: {
         collapse: true,
