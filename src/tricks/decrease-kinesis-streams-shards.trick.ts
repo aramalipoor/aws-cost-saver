@@ -78,7 +78,7 @@ export class DecreaseKinesisStreamsShardsTrick
     if (currentState && currentState.length > 0) {
       for (const stream of currentState) {
         subListr.add({
-          title: `${chalk.greenBright(stream.name)}`,
+          title: `${chalk.blue(stream.name)}`,
           task: (ctx, task) => this.conserveStreamShards(task, stream, options),
           options: {
             persistentOutput: true,
@@ -106,7 +106,7 @@ export class DecreaseKinesisStreamsShardsTrick
     if (originalState && originalState.length > 0) {
       for (const table of originalState) {
         subListr.add({
-          title: chalk.greenBright(table.name),
+          title: chalk.blue(table.name),
           task: (ctx, task) => this.restoreStreamShards(task, table, options),
           options: {
             persistentOutput: true,

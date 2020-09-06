@@ -105,7 +105,7 @@ describe('conserve', () => {
     AWSMock.restore('DynamoDB');
   });
 
-  it('writes to state-file', async () => {
+  it('writes to state-file using default storage', async () => {
     AWSMock.setSDKInstance(AWS);
 
     AWSMock.mock(
@@ -173,6 +173,96 @@ describe('conserve', () => {
     );
 
     AWSMock.restore('DynamoDB');
+  });
+
+  it('writes to state-file using s3 storage', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'listTables',
+      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
+        callback(null, { TableNames: ['foo'] });
+      },
+    );
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 15,
+                ReadCapacityUnits: 17,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
+    const updateTableSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+
+    AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
+
+    const headObjectSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback({ code: 'NotFound' }, null);
+      });
+
+    AWSMock.mock('S3', 'headObject', headObjectSpy);
+
+    const putObjectSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+
+    AWSMock.mock('S3', 'putObject', putObjectSpy);
+
+    await runConserve([
+      '--no-default-tricks',
+      '-u',
+      'decrease-dynamodb-provisioned-rcu-wcu',
+      '-s',
+      's3://my_bucket/some-dir/acs-state.json',
+    ]);
+
+    expect(putObjectSpy).toHaveBeenCalledTimes(1);
+    expect(putObjectSpy).toHaveBeenCalledWith(
+      {
+        Bucket: 'my_bucket',
+        Key: 'some-dir/acs-state.json',
+        Body: JSON.stringify(
+          {
+            'decrease-dynamodb-provisioned-rcu-wcu': [
+              {
+                name: 'foo',
+                provisionedThroughput: true,
+                rcu: 17,
+                wcu: 15,
+              },
+            ],
+          },
+          null,
+          2,
+        ),
+      },
+      expect.anything(),
+    );
+
+    AWSMock.restore('DynamoDB');
+    AWSMock.restore('S3');
   });
 
   it('partially writes state-file if some tasks fail to conserve', async () => {

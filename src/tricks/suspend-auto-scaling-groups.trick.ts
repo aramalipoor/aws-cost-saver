@@ -31,7 +31,7 @@ export class SuspendAutoScalingGroupsTrick
     const scalingGroups = await this.listAutoScalingGroups(task);
 
     if (!scalingGroups || scalingGroups.length === 0) {
-      task.skip(chalk.dim('No ASG found'));
+      task.skip(chalk.dim('no ASG found'));
       return;
     }
 
@@ -62,7 +62,7 @@ export class SuspendAutoScalingGroupsTrick
     if (currentState && currentState.length > 0) {
       for (const asgState of currentState) {
         subListr.add({
-          title: chalk.greenBright(`${asgState.name}`),
+          title: chalk.blue(`${asgState.name}`),
           task: (ctx, task) => this.conserveProcesses(task, asgState, options),
           options: {
             persistentOutput: true,
@@ -92,7 +92,7 @@ export class SuspendAutoScalingGroupsTrick
     if (originalState && originalState.length > 0) {
       for (const asgState of originalState) {
         subListr.add({
-          title: chalk.greenBright(`${asgState.name}`),
+          title: chalk.blue(`${asgState.name}`),
           task: (ctx, task) => this.restoreProcesses(task, asgState, options),
           options: {
             persistentOutput: true,

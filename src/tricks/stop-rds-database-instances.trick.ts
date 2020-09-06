@@ -39,7 +39,7 @@ export class StopRdsDatabaseInstancesTrick
     });
 
     if (!databases || databases.length === 0) {
-      task.skip(chalk.dim('No RDS databases found'));
+      task.skip(chalk.dim('no RDS databases found'));
       return subListr;
     }
 
@@ -91,7 +91,7 @@ export class StopRdsDatabaseInstancesTrick
     if (currentState && currentState.length > 0) {
       for (const database of currentState) {
         subListr.add({
-          title: chalk.greenBright(`${database.identifier}`),
+          title: chalk.blue(`${database.identifier}`),
           task: (ctx, task) => this.conserveDatabase(task, database, options),
           options: {
             persistentOutput: true,
@@ -121,7 +121,7 @@ export class StopRdsDatabaseInstancesTrick
     if (originalState && originalState.length > 0) {
       for (const database of originalState) {
         subListr.add({
-          title: chalk.greenBright(`${database.identifier}`),
+          title: chalk.blue(`${database.identifier}`),
           task: (ctx, task) => this.restoreDatabase(task, database, options),
           options: {
             persistentOutput: true,

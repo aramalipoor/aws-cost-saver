@@ -39,7 +39,7 @@ export class StopRdsDatabaseClustersTrick
     });
 
     if (!clusters || clusters.length === 0) {
-      task.skip(chalk.dim('No RDS clusters found'));
+      task.skip(chalk.dim('no RDS clusters found'));
       return subListr;
     }
 
@@ -91,7 +91,7 @@ export class StopRdsDatabaseClustersTrick
     if (currentState && currentState.length > 0) {
       for (const database of currentState) {
         subListr.add({
-          title: chalk.greenBright(`${database.identifier}`),
+          title: chalk.blue(`${database.identifier}`),
           task: (ctx, task) => this.conserveCluster(task, database, options),
           options: {
             persistentOutput: true,
@@ -121,7 +121,7 @@ export class StopRdsDatabaseClustersTrick
     if (originalState && originalState.length > 0) {
       for (const cluster of originalState) {
         subListr.add({
-          title: chalk.greenBright(`${cluster.identifier}`),
+          title: chalk.blue(`${cluster.identifier}`),
           task: (ctx, task) => this.restoreCluster(task, cluster, options),
           options: {
             persistentOutput: true,

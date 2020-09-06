@@ -39,7 +39,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     });
 
     if (!replicationGroups || replicationGroups.length === 0) {
-      task.skip(chalk.dim('No ElastiCache Redis clusters found'));
+      task.skip(chalk.dim('no ElastiCache Redis clusters found'));
       return subListr;
     }
 
@@ -95,7 +95,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     if (currentState && currentState.length > 0) {
       for (const replicationGroup of currentState) {
         subListr.add({
-          title: chalk.greenBright(replicationGroup.id),
+          title: chalk.blue(replicationGroup.id),
           task: (ctx, task) =>
             this.conserveReplicationGroup(task, replicationGroup, options),
           options: {
@@ -126,7 +126,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     if (originalState && originalState.length > 0) {
       for (const replicationGroup of originalState) {
         subListr.add({
-          title: chalk.greenBright(replicationGroup.id),
+          title: chalk.blue(replicationGroup.id),
           task: (ctx, task) =>
             this.restoreReplicationGroup(task, replicationGroup, options),
           options: {

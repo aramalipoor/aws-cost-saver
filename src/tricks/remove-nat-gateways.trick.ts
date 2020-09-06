@@ -113,7 +113,7 @@ export class RemoveNatGatewaysTrick
 
     for (const natGateway of currentState) {
       subListr.add({
-        title: chalk.greenBright(
+        title: chalk.blue(
           `${natGateway.id} / ${RemoveNatGatewaysTrick.getNameTag(natGateway)}`,
         ),
         task: (ctx, task) => this.conserveNatGateway(task, natGateway, options),
@@ -141,7 +141,7 @@ export class RemoveNatGatewaysTrick
 
     for (const natGateway of originalState) {
       subListr.add({
-        title: chalk.greenBright(natGateway.id),
+        title: chalk.blue(natGateway.id),
         task: (ctx, task) => this.restoreNatGateway(task, natGateway, options),
         options: {
           persistentOutput: true,

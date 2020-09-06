@@ -78,7 +78,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
-          title: `${chalk.greenBright(table.name)}`,
+          title: `${chalk.blue(table.name)}`,
           task: (ctx, task) =>
             this.conserveTableProvisionedRcuWcu(task, table, options),
           options: {
@@ -107,7 +107,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
-          title: `${chalk.greenBright(table.name)}`,
+          title: `${chalk.blue(table.name)}`,
           task: (ctx, task) =>
             this.restoreTableProvisionedRcuWcu(task, table, options),
           options: {
@@ -217,6 +217,23 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
       task.skip(
         chalk.dim(
           `skipped, RCU = ${tableState.rcu} WCU = ${tableState.wcu} are not configured correctly`,
+        ),
+      );
+      return;
+    }
+
+    const currentState = {
+      name: tableState.name,
+    } as DynamoDBTableState;
+    await this.getTableState(task, currentState);
+
+    if (
+      currentState.rcu === tableState.rcu &&
+      currentState.wcu === tableState.wcu
+    ) {
+      task.skip(
+        chalk.dim(
+          `skipped, RCU = ${tableState.rcu} WCU = ${tableState.wcu} are already configured`,
         ),
       );
       return;

@@ -1,3 +1,6 @@
+## [v0.0.13](https://github.com/aramalipoor/aws-cost-saver/compare/v0.0.11...v0.0.12) (2020-09-XX)
+* Add S3 storage for state file ([#27](https://github.com/aramalipoor/aws-cost-saver/pull/27))
+
 ## [v0.0.12](https://github.com/aramalipoor/aws-cost-saver/compare/v0.0.11...v0.0.12) (2020-09-05)
 * Collapse when actions finish to keep clutter to minimum during operations ([#26](https://github.com/aramalipoor/aws-cost-saver/pull/26))
 * Introduce -m|--only-summary flag to print a clean summary of actions ([#26](https://github.com/aramalipoor/aws-cost-saver/pull/26))

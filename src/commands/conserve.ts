@@ -1,5 +1,4 @@
 import chalk from 'chalk';
-import { writeFileSync } from 'fs';
 import { flags } from '@oclif/command';
 import {
   Listr,
@@ -11,7 +10,7 @@ import figures from 'figures';
 
 import BaseCommand from '../base-command';
 import { configureAWS } from '../configure-aws';
-import { TrickRegistry } from '../tricks/trick-registry';
+import { TrickRegistry } from '../tricks/trick.registry';
 import { TrickInterface } from '../interfaces/trick.interface';
 
 import { ShutdownEC2InstancesTrick } from '../tricks/shutdown-ec2-instances.trick';
@@ -174,13 +173,9 @@ export default class Conserve extends BaseCommand {
     this.renderSummary(listr.tasks);
 
     if (!flags['no-state-file']) {
-      writeFileSync(
-        flags['state-file'],
-        JSON.stringify(rootState, null, 2),
-        'utf-8',
-      );
+      await this.writeStateFile(flags['state-file'], rootState);
       this.log(
-        `\n  ${chalk.green(figures.pointer)} Wrote state file to ${chalk.green(
+        `  ${chalk.green(figures.pointer)} wrote state to ${chalk.green(
           flags['state-file'],
         )}`,
       );
@@ -191,7 +186,7 @@ export default class Conserve extends BaseCommand {
     if (errors && errors.length > 0) {
       if (errors.length < listr.tasks.length) {
         this.log(
-          `\n${chalk.yellow(figures.tick)} Partially finished, with ${chalk.red(
+          `\n${chalk.yellow(figures.tick)} partially finished, with ${chalk.red(
             `${errors.length} failed tricks out of ${listr.tasks.length}`,
           )}.`,
         );
@@ -207,11 +202,11 @@ export default class Conserve extends BaseCommand {
     } else if (flags['dry-run']) {
       this.log(
         `\n${chalk.yellow(
-          ` ${figures.warning} Skipped conserve due to dry-run.`,
+          ` ${figures.warning} skipped conserve due to dry-run.`,
         )}`,
       );
     } else {
-      this.log(`\n ${chalk.green(figures.tick)} Successfully conserved.`);
+      this.log(`\n ${chalk.green(figures.tick)} successfully conserved.`);
     }
   }
 
@@ -272,9 +267,9 @@ export default class Conserve extends BaseCommand {
       const trick = tricks.find(trick => trick.getMachineName() === trickName);
 
       if (!trick) {
-        this.log(`Could not find a trick named ${chalk.yellow(trickName)}`);
+        this.log(`could not find a trick named ${chalk.yellow(trickName)}`);
         this.log(
-          `Run ${chalk.yellow(
+          `run ${chalk.yellow(
             'aws-cost-saver conserve --help',
           )} to get a list of available tricks.\n`,
         );

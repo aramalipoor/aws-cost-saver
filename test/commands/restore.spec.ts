@@ -37,7 +37,7 @@ beforeEach(async () => {
 describe('conserve', () => {
   mockProcessStdout();
 
-  it('restores resources from state-file', async () => {
+  it('restores resources from state-file from default storage', async () => {
     AWSMock.setSDKInstance(AWS);
 
     const updateTableSpy = jest
@@ -47,6 +47,26 @@ describe('conserve', () => {
       });
 
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 1,
+                ReadCapacityUnits: 1,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
 
     jest.spyOn(fs, 'readFileSync').mockReturnValueOnce(
       JSON.stringify(
@@ -80,6 +100,78 @@ describe('conserve', () => {
     );
 
     AWSMock.restore('DynamoDB');
+  });
+
+  it('restores resources from state-file from s3 storage', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const updateTableSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+
+    AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 1,
+                ReadCapacityUnits: 1,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
+    const getObjectSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {
+          Body: JSON.stringify(
+            {
+              'decrease-dynamodb-provisioned-rcu-wcu': [
+                {
+                  name: 'foo',
+                  provisionedThroughput: true,
+                  rcu: 17,
+                  wcu: 15,
+                },
+              ],
+            },
+            null,
+            2,
+          ),
+        });
+      });
+
+    AWSMock.mock('S3', 'getObject', getObjectSpy);
+
+    await runRestore(['-s', 's3://my_bucket/some-dir/acs-state.json']);
+
+    expect(updateTableSpy).toHaveBeenCalledTimes(1);
+    expect(updateTableSpy).toBeCalledWith(
+      expect.objectContaining({
+        TableName: 'foo',
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 17,
+          WriteCapacityUnits: 15,
+        },
+      }),
+      expect.anything(),
+    );
+
+    AWSMock.restore('DynamoDB');
+    AWSMock.restore('S3');
   });
 
   it('does nothing when in dry-run mode', async () => {
@@ -130,6 +222,26 @@ describe('conserve', () => {
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 1,
+                ReadCapacityUnits: 1,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
 
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
     AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);
