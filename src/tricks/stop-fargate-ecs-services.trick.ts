@@ -83,7 +83,7 @@ export class StopFargateEcsServicesTrick
     for (const cluster of currentState) {
       for (const service of cluster.services) {
         subListr.add({
-          title: `${chalk.greenBright(
+          title: `${chalk.blue(
             StopFargateEcsServicesTrick.getEcsServiceResourceId(
               cluster.arn,
               service.arn,
@@ -145,7 +145,7 @@ export class StopFargateEcsServicesTrick
     for (const cluster of originalState) {
       for (const service of cluster.services) {
         subListr.add({
-          title: `${chalk.greenBright(
+          title: `${chalk.blue(
             StopFargateEcsServicesTrick.getEcsServiceResourceId(
               cluster.arn,
               service.arn,

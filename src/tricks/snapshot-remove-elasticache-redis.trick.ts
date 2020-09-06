@@ -95,7 +95,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     if (currentState && currentState.length > 0) {
       for (const replicationGroup of currentState) {
         subListr.add({
-          title: chalk.greenBright(replicationGroup.id),
+          title: chalk.blue(replicationGroup.id),
           task: (ctx, task) =>
             this.conserveReplicationGroup(task, replicationGroup, options),
           options: {
@@ -126,7 +126,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     if (originalState && originalState.length > 0) {
       for (const replicationGroup of originalState) {
         subListr.add({
-          title: chalk.greenBright(replicationGroup.id),
+          title: chalk.blue(replicationGroup.id),
           task: (ctx, task) =>
             this.restoreReplicationGroup(task, replicationGroup, options),
           options: {

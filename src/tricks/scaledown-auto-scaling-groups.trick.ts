@@ -65,7 +65,7 @@ export class ScaledownAutoScalingGroupsTrick
     if (currentState && currentState.length > 0) {
       for (const asgState of currentState) {
         subListr.add({
-          title: chalk.greenBright(`${asgState.name}`),
+          title: chalk.blue(`${asgState.name}`),
           task: (ctx, task) =>
             this.conserveAutoScalingGroup(task, asgState, options),
           options: {
@@ -96,7 +96,7 @@ export class ScaledownAutoScalingGroupsTrick
     if (originalState && originalState.length > 0) {
       for (const asgState of originalState) {
         subListr.add({
-          title: chalk.greenBright(`${asgState.name}`),
+          title: chalk.blue(`${asgState.name}`),
           task: (ctx, task) =>
             this.restoreAutoScalingGroup(task, asgState, options),
           options: {

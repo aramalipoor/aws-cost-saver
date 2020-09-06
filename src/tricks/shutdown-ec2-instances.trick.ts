@@ -105,7 +105,7 @@ export class ShutdownEC2InstancesTrick
     if (currentState && currentState.length > 0) {
       for (const instance of currentState) {
         subListr.add({
-          title: chalk.greenBright(`${instance.id} / ${instance.name}`),
+          title: chalk.blue(`${instance.id} / ${instance.name}`),
           task: (ctx, task) => this.conserveInstance(task, instance, options),
           options: {
             persistentOutput: true,
@@ -135,7 +135,7 @@ export class ShutdownEC2InstancesTrick
     if (originalState && originalState.length > 0) {
       for (const instance of originalState) {
         subListr.add({
-          title: chalk.greenBright(`${instance.id} / ${instance.name}`),
+          title: chalk.blue(`${instance.id} / ${instance.name}`),
           task: (ctx, task) => this.restoreInstance(task, instance, options),
           options: {
             persistentOutput: true,

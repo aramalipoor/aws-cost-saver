@@ -78,7 +78,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
-          title: `${chalk.greenBright(table.name)}`,
+          title: `${chalk.blue(table.name)}`,
           task: (ctx, task) =>
             this.conserveTableProvisionedRcuWcu(task, table, options),
           options: {
@@ -107,7 +107,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     if (currentState && currentState.length > 0) {
       for (const table of currentState) {
         subListr.add({
-          title: `${chalk.greenBright(table.name)}`,
+          title: `${chalk.blue(table.name)}`,
           task: (ctx, task) =>
             this.restoreTableProvisionedRcuWcu(task, table, options),
           options: {
