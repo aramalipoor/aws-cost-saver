@@ -76,9 +76,10 @@ export default class Restore extends BaseCommand {
             .restore(task, rootState[trick.getMachineName()], options)
             .catch(task.report);
         },
-        exitOnError: false,
-        collapse: true,
-      } as ListrTask);
+        options: {
+          persistentOutput: true,
+        },
+      });
     }
 
     const listr = new Listr<RootState, 'silent' | 'default'>(taskList, {
@@ -87,6 +88,7 @@ export default class Restore extends BaseCommand {
       exitOnError: false,
       rendererOptions: {
         collapse: true,
+        collapseSkips: false,
         showTimer: true,
         showSubtasks: true,
         clearOutput: true,
