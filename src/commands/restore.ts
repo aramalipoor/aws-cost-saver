@@ -69,7 +69,7 @@ export default class Restore extends BaseCommand {
         title: `${chalk.dim(`restore:`)} ${trick.getMachineName()}`,
         task: async (ctx, task) => {
           if (!rootState[trick.getMachineName()]) {
-            return task.skip('nothing was conserved previously.');
+            return task.skip(chalk.dim('nothing was conserved previously.'));
           }
 
           return trick

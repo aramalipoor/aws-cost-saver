@@ -10,8 +10,8 @@ A tiny CLI tool to help save costs in development environments when you're aslee
     * [`conserve`](#conserve)
     * [`restore`](#restore)
   * [State-file](#state-file)
-    * [`AWS S3`](#aws-s3)
-    * [`Local file system`](#local-file-system)
+    * [AWS S3](#aws-s3)
+    * [Local File System](#local-file-system)
 * [Tricks](#tricks)
   1. [shutdown-ec2-instances](#-shutdown-ec2-instances)
   2. [stop-fargate-ecs-services](#-stop-fargate-ecs-services)
@@ -100,7 +100,7 @@ aws-cost-saver supports `file:` and `s3:` storage providers.
 ```sh
 $ aws-cost-saver conserve --dry-run --state-file s3://my-bucket-name/some-dir/aws-cost-saver.json
 ```
-#### Local file system
+#### Local File System
 ```sh
 $ aws-cost-saver conserve --dry-run --state-file file://./aws-cost-saver.json
 $ aws-cost-saver conserve --dry-run --state-file file:///etc/aws-cost-saver.json

@@ -155,7 +155,7 @@ export class StopFargateEcsServicesTrick
             task.newListr(
               [
                 {
-                  title: 'desired count',
+                  title: chalk.bold(chalk.dim('desired count')),
                   task: (ctx, task) =>
                     this.restoreDesiredCount(task, cluster, service, options),
                   options: {
@@ -163,7 +163,7 @@ export class StopFargateEcsServicesTrick
                   },
                 },
                 {
-                  title: 'auto scaling',
+                  title: chalk.bold(chalk.dim('auto scaling')),
                   task: (ctx, task) =>
                     this.restoreScalableTargets(
                       task,
