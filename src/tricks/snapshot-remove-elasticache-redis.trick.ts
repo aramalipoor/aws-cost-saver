@@ -39,7 +39,7 @@ export class SnapshotRemoveElasticacheRedisTrick
     });
 
     if (!replicationGroups || replicationGroups.length === 0) {
-      task.skip(chalk.dim('No ElastiCache Redis clusters found'));
+      task.skip(chalk.dim('no ElastiCache Redis clusters found'));
       return subListr;
     }
 

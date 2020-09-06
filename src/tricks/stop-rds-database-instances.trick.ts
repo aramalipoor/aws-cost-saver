@@ -39,7 +39,7 @@ export class StopRdsDatabaseInstancesTrick
     });
 
     if (!databases || databases.length === 0) {
-      task.skip(chalk.dim('No RDS databases found'));
+      task.skip(chalk.dim('no RDS databases found'));
       return subListr;
     }
 

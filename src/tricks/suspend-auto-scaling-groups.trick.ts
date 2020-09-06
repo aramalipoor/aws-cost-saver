@@ -31,7 +31,7 @@ export class SuspendAutoScalingGroupsTrick
     const scalingGroups = await this.listAutoScalingGroups(task);
 
     if (!scalingGroups || scalingGroups.length === 0) {
-      task.skip(chalk.dim('No ASG found'));
+      task.skip(chalk.dim('no ASG found'));
       return;
     }
 

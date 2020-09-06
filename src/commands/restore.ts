@@ -1,14 +1,13 @@
 import chalk from 'chalk';
-import { readFileSync } from 'fs';
 import { flags } from '@oclif/command';
 import { Listr, ListrTask } from 'listr2';
+import figures from 'figures';
 
 import BaseCommand from '../base-command';
-import { TrickRegistry } from '../tricks/trick-registry';
+import { TrickRegistry } from '../tricks/trick.registry';
 import { configureAWS } from '../configure-aws';
 import { RootState } from '../interfaces/root-state';
 import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
-import figures from 'figures';
 
 export default class Restore extends BaseCommand {
   static description =
@@ -58,8 +57,8 @@ export default class Restore extends BaseCommand {
     this.printBanner(awsConfig, flags);
 
     const tricksRegistry = TrickRegistry.initialize();
-    const stateContent = readFileSync(flags['state-file'], 'utf-8');
-    const rootState: RootState = JSON.parse(stateContent.toString());
+    const stateContent = await this.readStateFile(flags['state-file']);
+    const rootState: RootState = JSON.parse(stateContent);
     const taskList: ListrTask[] = [];
     const options: TrickOptionsInterface = {
       dryRun: flags['dry-run'],
@@ -70,7 +69,7 @@ export default class Restore extends BaseCommand {
         title: `${chalk.dim(`restore:`)} ${trick.getMachineName()}`,
         task: async (ctx, task) => {
           if (!rootState[trick.getMachineName()]) {
-            return task.skip('Nothing was conserved previously.');
+            return task.skip('nothing was conserved previously.');
           }
 
           return trick

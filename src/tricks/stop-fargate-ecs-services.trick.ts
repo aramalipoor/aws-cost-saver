@@ -44,7 +44,7 @@ export class StopFargateEcsServicesTrick
     });
 
     if (!clustersArn || clustersArn.length === 0) {
-      task.skip(chalk.dim('No clusters found'));
+      task.skip(chalk.dim('no clusters found'));
       return subListr;
     }
 
@@ -93,7 +93,7 @@ export class StopFargateEcsServicesTrick
             task.newListr(
               [
                 {
-                  title: 'desired count',
+                  title: chalk.bold(chalk.dim('desired count')),
                   task: (ctx, task) =>
                     this.conserveDesiredCount(task, cluster, service, options),
                   options: {
@@ -101,7 +101,7 @@ export class StopFargateEcsServicesTrick
                   },
                 },
                 {
-                  title: 'auto scaling',
+                  title: chalk.bold(chalk.dim('auto scaling')),
                   task: (ctx, task) =>
                     this.conserveScalableTargets(
                       task,
@@ -198,7 +198,7 @@ export class StopFargateEcsServicesTrick
     const services = await this.describeAllServices(task, clusterState.arn);
 
     if (!services || services.length === 0) {
-      task.skip(chalk.dim('No services found'));
+      task.skip(chalk.dim('no services found'));
       return;
     }
 

@@ -1,13 +1,23 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import { existsSync } from 'fs';
 import { Command } from '@oclif/command';
 import { Task } from 'listr2/dist/lib/task';
 import { ListrTaskObject } from 'listr2';
 import figures from 'figures';
+import * as Config from '@oclif/config';
+
+import { RootState } from './interfaces/root-state';
+import { StorageResolver } from './storage/storage.resolver';
 
 export default abstract class BaseCommand extends Command {
+  private storageResolver: StorageResolver;
+
+  constructor(argv: string[], config: Config.IConfig) {
+    super(argv, config);
+    this.storageResolver = StorageResolver.initialize();
+  }
+
   protected printBanner(awsConfig: AWS.Config, flags: Record<string, any>) {
     const awsRegion = awsConfig.region || flags.region;
     const awsProfile = (awsConfig.credentials as any).profile || flags.profile;
@@ -36,8 +46,26 @@ AWS Cost Saver
     }
   }
 
+  protected writeStateFile(uri: string, state: RootState): Promise<void> {
+    const storage = this.storageResolver.resolveByUri(uri);
+    return storage.write(uri, JSON.stringify(state, null, 2));
+  }
+
+  protected stateFileExists(uri: string): Promise<boolean> {
+    const storage = this.storageResolver.resolveByUri(uri);
+    return storage.exists(uri);
+  }
+
+  protected readStateFile(uri: string): Promise<string> {
+    const storage = this.storageResolver.resolveByUri(uri);
+    return storage.read(uri);
+  }
+
   protected async validateStateFilePath(flags: Record<string, any>) {
-    if (!flags['no-state-file'] && existsSync(flags['state-file'])) {
+    if (
+      !flags['no-state-file'] &&
+      (await this.stateFileExists(flags['state-file']))
+    ) {
       this.log(
         chalk.yellow(
           `\n→ State file already exists: ${chalk.yellowBright(
@@ -111,7 +139,7 @@ AWS Cost Saver
       }
 
       if (task.output) {
-        this.consoleWriteLine(`${' '.repeat(level)}${chalk.gray(task.output)}`);
+        this.consoleWriteLine(`${' '.repeat(level)}${chalk.dim(task.output)}`);
       }
 
       if (task.message) {
@@ -123,7 +151,7 @@ AWS Cost Saver
           );
         if (task.message.skip)
           this.consoleWriteLine(
-            `${' '.repeat(level)} ${chalk.gray(
+            `${' '.repeat(level)} ${chalk.dim(
               `${figures.arrowDown} ${task.message.skip}`,
             )}`,
           );

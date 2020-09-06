@@ -39,7 +39,7 @@ export class ShutdownEC2InstancesTrick
     });
 
     if (!reservations || reservations.length === 0) {
-      task.skip(chalk.dim('No EC2 instances found'));
+      task.skip(chalk.dim('no EC2 instances found'));
       return subListr;
     }
 

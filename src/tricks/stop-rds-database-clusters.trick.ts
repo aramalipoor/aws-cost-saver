@@ -39,7 +39,7 @@ export class StopRdsDatabaseClustersTrick
     });
 
     if (!clusters || clusters.length === 0) {
-      task.skip(chalk.dim('No RDS clusters found'));
+      task.skip(chalk.dim('no RDS clusters found'));
       return subListr;
     }
 

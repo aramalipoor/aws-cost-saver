@@ -19,7 +19,8 @@
     "inquirer": "^7.3.3",
     "listr2": "2.6.2",
     "lodash": "^4.17.19",
-    "tslib": "^1.13.0"
+    "tslib": "^1.13.0",
+    "url-parse": "^1.4.7"
   },
   "devDependencies": {
     "@oclif/dev-cli": "^1.22.2",
@@ -30,6 +31,7 @@
     "@types/jest": "^26.0.10",
     "@types/lodash": "^4.14.159",
     "@types/node": "^10.17.28",
+    "@types/url-parse": "^1.4.3",
     "aws-sdk-mock": "^5.1.0",
     "codecov": "^3.7.2",
     "eslint": "^5.16.0",
