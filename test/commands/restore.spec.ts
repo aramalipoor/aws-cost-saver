@@ -48,6 +48,26 @@ describe('conserve', () => {
 
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
 
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 1,
+                ReadCapacityUnits: 1,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
     jest.spyOn(fs, 'readFileSync').mockReturnValueOnce(
       JSON.stringify(
         {
@@ -92,6 +112,26 @@ describe('conserve', () => {
       });
 
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 1,
+                ReadCapacityUnits: 1,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
 
     const getObjectSpy = jest
       .fn()
@@ -182,6 +222,26 @@ describe('conserve', () => {
       .mockImplementationOnce((params, callback) => {
         callback(null, {});
       });
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 1,
+                ReadCapacityUnits: 1,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
 
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
     AWSMock.mock('RDS', 'startDBInstance', startDBInstanceSpy);

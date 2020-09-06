@@ -317,6 +317,26 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
       });
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
 
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 1,
+                ReadCapacityUnits: 1,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
     const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
     const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [
       {
@@ -387,46 +407,6 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     AWSMock.restore('DynamoDB');
   });
 
-  it('restores table if RCU and WCU was already 1', async () => {
-    AWSMock.setSDKInstance(AWS);
-
-    const updateTableSpy = jest
-      .fn()
-      .mockImplementationOnce((params, callback) => {
-        callback(null, {});
-      });
-    AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
-
-    const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
-    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [
-      {
-        name: 'foo',
-        provisionedThroughput: true,
-        rcu: 1,
-        wcu: 1,
-      },
-    ];
-
-    const restoreListr = await instance.restore(task, stateObject, {
-      dryRun: false,
-    });
-
-    await restoreListr.run({});
-
-    expect(updateTableSpy).toBeCalledWith(
-      expect.objectContaining({
-        TableName: 'foo',
-        ProvisionedThroughput: {
-          ReadCapacityUnits: 1,
-          WriteCapacityUnits: 1,
-        },
-      }),
-      expect.anything(),
-    );
-
-    AWSMock.restore('DynamoDB');
-  });
-
   it('skips restore for table if RCU and WCU is not provided in state', async () => {
     AWSMock.setSDKInstance(AWS);
 
@@ -441,6 +421,57 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
     const stateObject = JSON.parse(
       `[{"name": "foo", "provisionedThroughput": true}]`,
     ) as DecreaseDynamoDBProvisionedRcuWcuState;
+
+    const restoreListr = await instance.restore(task, stateObject, {
+      dryRun: false,
+    });
+
+    await restoreListr.run({});
+
+    expect(updateTableSpy).not.toBeCalled();
+
+    AWSMock.restore('DynamoDB');
+  });
+
+  it('skips restore for table if RCU and WCU are already configured', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const updateTableSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+    AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 5,
+                ReadCapacityUnits: 5,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
+    const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
+    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [
+      {
+        name: 'foo',
+        provisionedThroughput: true,
+        rcu: 5,
+        wcu: 5,
+      },
+    ];
 
     const restoreListr = await instance.restore(task, stateObject, {
       dryRun: false,

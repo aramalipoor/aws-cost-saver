@@ -222,6 +222,23 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
       return;
     }
 
+    const currentState = {
+      name: tableState.name,
+    } as DynamoDBTableState;
+    await this.getTableState(task, currentState);
+
+    if (
+      currentState.rcu === tableState.rcu &&
+      currentState.wcu === tableState.wcu
+    ) {
+      task.skip(
+        chalk.dim(
+          `skipped, RCU = ${tableState.rcu} WCU = ${tableState.wcu} are already configured`,
+        ),
+      );
+      return;
+    }
+
     task.output = `configuring ${tableState.rcu} WCU = ${tableState.wcu} ...`;
     await this.ddbClient
       .updateTable({
