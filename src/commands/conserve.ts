@@ -106,6 +106,12 @@ export default class Conserve extends BaseCommand {
       description:
         'Ignore saving current state, useful when want to only conserve as much money as possible.',
     }),
+    'overwrite-state-file': flags.boolean({
+      char: 'w',
+      default: false,
+      description:
+        'Overwrite state-file if it exists. WARNING: Use with caution as this might overwrite non-restored state-file.',
+    }),
     'use-trick': flags.string({
       char: 'u',
       multiple: true,

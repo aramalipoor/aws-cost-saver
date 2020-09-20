@@ -62,10 +62,11 @@ AWS Cost Saver
   }
 
   protected async validateStateFilePath(flags: Record<string, any>) {
-    if (
-      !flags['no-state-file'] &&
-      (await this.stateFileExists(flags['state-file']))
-    ) {
+    const n = !flags['no-state-file'];
+    const w = !flags['overwrite-state-file'];
+    const e = await this.stateFileExists(flags['state-file']);
+
+    if (n && w && e) {
       this.log(
         chalk.yellow(
           `\n→ State file already exists: ${chalk.yellowBright(
