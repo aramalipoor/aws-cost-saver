@@ -1,4 +1,7 @@
-## [v0.0.13](https://github.com/aramalipoor/aws-cost-saver/compare/v0.0.11...v0.0.12) (2020-09-XX)
+# [v0.1.0](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.1.0) (2020-09-20)
+* Add `-w | --overwrite-state-file` flag ([#30](https://github.com/aramalipoor/aws-cost-saver/pull/30))
+
+## [v0.0.13](https://github.com/aramalipoor/aws-cost-saver/compare/v0.0.12...v0.0.13) (2020-09-06)
 * Add S3 storage for state file ([#27](https://github.com/aramalipoor/aws-cost-saver/pull/27))
 
 ## [v0.0.12](https://github.com/aramalipoor/aws-cost-saver/compare/v0.0.11...v0.0.12) (2020-09-05)

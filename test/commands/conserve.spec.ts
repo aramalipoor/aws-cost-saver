@@ -695,6 +695,54 @@ describe('conserve', () => {
     AWSMock.restore('DynamoDB');
   });
 
+  it('overwrites state-file if overwrite-state-file flag is provided', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'listTables',
+      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
+        callback(null, { TableNames: ['foo'] });
+      },
+    );
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 15,
+                ReadCapacityUnits: 17,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
+    jest.spyOn(fs, 'existsSync').mockReturnValueOnce(true);
+    const promptSpy = jest.spyOn(inquirer, 'prompt');
+
+    await runConserve([
+      '--dry-run',
+      '--overwrite-state-file',
+      '--no-default-tricks',
+      '-u',
+      'decrease-dynamodb-provisioned-rcu-wcu',
+    ]);
+
+    expect(fs.writeFileSync).toHaveBeenCalled();
+    expect(promptSpy).not.toHaveBeenCalled();
+
+    AWSMock.restore('DynamoDB');
+  });
+
   it('uses silent renderer if only-summary flag is passed', async () => {
     AWSMock.setSDKInstance(AWS);
 
