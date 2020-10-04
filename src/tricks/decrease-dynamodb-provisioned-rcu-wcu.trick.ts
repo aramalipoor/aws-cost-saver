@@ -191,8 +191,8 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
 
     if (
       !table.ProvisionedThroughput ||
-      (!table.ProvisionedThroughput.ReadCapacityUnits &&
-        !table.ProvisionedThroughput.WriteCapacityUnits)
+      !table.ProvisionedThroughput.ReadCapacityUnits ||
+      !table.ProvisionedThroughput.WriteCapacityUnits
     ) {
       tableState.provisionedThroughput = false;
       return;
