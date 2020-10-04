@@ -132,9 +132,9 @@ AWS Cost Saver
         cleanTitle.includes('prepare tags') ||
         cleanTitle.includes('fetch current state')
       ) {
-        // if (this.collectErrors(task.subtasks).length === 0) {
-        //   continue;
-        // }
+        if (this.collectErrors([task]).length === 0) {
+          continue;
+        }
       }
 
       if (!cleanTitle.includes('conserve resources')) {

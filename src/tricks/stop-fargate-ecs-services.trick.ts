@@ -113,65 +113,69 @@ export class StopFargateEcsServicesTrick
       },
     });
 
-    for (const cluster of currentState) {
-      subListr.add({
-        title: `${cluster.arn.split(':').pop()}`,
-        task: (ctx, task) => {
-          if (cluster.services.length === 0) {
-            task.skip(`no services found`);
-            return;
-          }
+    if (currentState && currentState.length > 0) {
+      for (const cluster of currentState) {
+        subListr.add({
+          title: `${cluster.arn.split(':').pop()}`,
+          task: (ctx, task) => {
+            if (cluster.services.length === 0) {
+              task.skip(`no services found`);
+              return;
+            }
 
-          return task.newListr(
-            cluster.services.map(service => ({
-              title: `${chalk.blue(
-                StopFargateEcsServicesTrick.getEcsServiceResourceId(
-                  cluster.arn,
-                  service.arn,
-                ),
-              )}`,
-              task: (ctx, task) =>
-                task.newListr(
-                  [
+            return task.newListr(
+              cluster.services.map(service => ({
+                title: `${chalk.blue(
+                  StopFargateEcsServicesTrick.getEcsServiceResourceId(
+                    cluster.arn,
+                    service.arn,
+                  ),
+                )}`,
+                task: (ctx, task) =>
+                  task.newListr(
+                    [
+                      {
+                        title: chalk.bold(chalk.dim('desired count')),
+                        task: (ctx, task) =>
+                          this.conserveDesiredCount(
+                            task,
+                            cluster,
+                            service,
+                            options,
+                          ),
+                        options: {
+                          persistentOutput: true,
+                        },
+                      },
+                      {
+                        title: chalk.bold(chalk.dim('auto scaling')),
+                        task: (ctx, task) =>
+                          this.conserveScalableTargets(
+                            task,
+                            cluster,
+                            service,
+                            options,
+                          ),
+                        options: {
+                          persistentOutput: true,
+                        },
+                      },
+                    ],
                     {
-                      title: chalk.bold(chalk.dim('desired count')),
-                      task: (ctx, task) =>
-                        this.conserveDesiredCount(
-                          task,
-                          cluster,
-                          service,
-                          options,
-                        ),
-                      options: {
-                        persistentOutput: true,
+                      exitOnError: false,
+                      concurrent: true,
+                      rendererOptions: {
+                        collapse: true,
                       },
                     },
-                    {
-                      title: chalk.bold(chalk.dim('auto scaling')),
-                      task: (ctx, task) =>
-                        this.conserveScalableTargets(
-                          task,
-                          cluster,
-                          service,
-                          options,
-                        ),
-                      options: {
-                        persistentOutput: true,
-                      },
-                    },
-                  ],
-                  {
-                    exitOnError: false,
-                    concurrent: true,
-                    rendererOptions: {
-                      collapse: true,
-                    },
-                  },
-                ),
-            })),
-          );
-        },
-      });
+                  ),
+              })),
+            );
+          },
+        });
+      }
+    } else {
+      task.skip(chalk.dim(`no Fargate clusters found`));
     }
 
     return subListr;

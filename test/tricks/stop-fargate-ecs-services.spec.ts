@@ -668,6 +668,29 @@ describe('stop-fargate-ecs-services', () => {
     AWSMock.restore('ApplicationAutoScaling');
   });
 
+  it('skips conserve if no clusters found', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const instance = new StopFargateEcsServicesTrick();
+    const stateObject: StopFargateEcsServicesState = [];
+
+    const updateServiceSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+    AWSMock.mock('ECS', 'updateService', updateServiceSpy);
+
+    await instance.conserve(task, stateObject, {
+      dryRun: false,
+    });
+
+    expect(updateServiceSpy).not.toBeCalled();
+    expect(task.skip).toBeCalledWith(expect.any(String));
+
+    AWSMock.restore('ECS');
+  });
+
   it('skips conserve when desired count is already zero', async () => {
     AWSMock.setSDKInstance(AWS);
 
