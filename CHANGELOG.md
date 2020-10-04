@@ -1,3 +1,6 @@
+# [v0.2.0](https://github.com/aramalipoor/aws-cost-saver/compare/v0.1.0...v0.2.0) (2020-10-XX)
+* Add `-t | --tag` flag ([#31](https://github.com/aramalipoor/aws-cost-saver/pull/31))
+
 # [v0.1.0](https://github.com/aramalipoor/aws-cost-saver/releases/tag/v0.1.0) (2020-09-20)
 * Add `-w | --overwrite-state-file` flag ([#30](https://github.com/aramalipoor/aws-cost-saver/pull/30))
 
