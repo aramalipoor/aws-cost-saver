@@ -11,7 +11,7 @@
     "pretty": true,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": ".",
+    "rootDir": "src",
     "importHelpers": true,
     "strict": true,
     "noImplicitAny": true,
