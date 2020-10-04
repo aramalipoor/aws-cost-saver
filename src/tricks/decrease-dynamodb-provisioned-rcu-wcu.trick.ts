@@ -1,6 +1,7 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
 import { TrickInterface } from '../types/trick.interface';
 import { TrickOptionsInterface } from '../types/trick-options.interface';
@@ -32,7 +33,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     task: ListrTaskWrapper<any, any>,
     options: TrickOptionsInterface,
   ): Promise<void> {
-    const resourceTagMappings: AWS.ResourceGroupsTaggingAPI.ResourceTagMappingList = [];
+    const resourceTagMappings: ResourceTagMappingList = [];
 
     // TODO Add logic to go through all pages
     task.output = 'fetching page 1...';
@@ -45,7 +46,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
             TagFilters: options.tags,
           })
           .promise()
-      ).ResourceTagMappingList || []),
+      ).ResourceTagMappingList as ResourceTagMappingList),
     );
 
     context.resourceTagMappings = resourceTagMappings;

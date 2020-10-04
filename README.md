@@ -36,6 +36,8 @@ $ npm install -g aws-cost-saver
 $ aws-cost-saver conserve --help
 $ aws-cost-saver conserve --dry-run --no-state-file
 $ aws-cost-saver conserve --dry-run --no-state-file --only-summary
+$ aws-cost-saver conserve -d -n --tag Team=Tacos
+$ aws-cost-saver conserve -d -n --tag Team=Tacos --tag Application=Orders
 
 # Use
 $ aws-cost-saver conserve
@@ -64,6 +66,7 @@ OPTIONS
   -i, --ignore-trick trick-machine-name  Disables an individual trick. Useful when you do not like to use a specific trick. Can be used multiple times.
   --no-default-tricks                    Disables all default tricks. Useful alongside --use-trick to enable only specific set of tricks.
   
+  -t, --tag Name[=Value]                 Tags to narrow down targeted resources. Multiple tags will be AND-ed. Providing "Value" is optional.
   -r, --region eu-central-1              [default: eu-central-1] AWS Region to converse resources in.
   -p, --profile my-aws-profile           [default: default] AWS Profile to use from ~/.aws/config
   -m, --only-summary                     Do not render live progress. Only print final summary in a clean format.
@@ -187,7 +190,7 @@ $ aws-cost-saver conserve --use-trick scaledown-auto-scaling-groups
 ### # suspend-auto-scaling-groups
 When Auto Scaling Groups processes are active they might launch EC2 instances. This trick will suspend all processes of ASGs to prevent launching new instances.
 
-### # TODO
+### # etc
 If you know any other tricks to save some money feel free to create a Pull Request or raise an issue.
 
 # Alternatives
