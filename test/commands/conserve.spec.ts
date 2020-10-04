@@ -331,9 +331,24 @@ describe('conserve', () => {
         params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
         callback: Function,
       ) => {
-        callback(null, {
-          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
-        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+        if (params.ResourceTypeFilters?.includes('dynamodb:table')) {
+          callback(null, {
+            ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+          } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+        } else if (params.ResourceTypeFilters?.includes('rds:db')) {
+          callback(null, {
+            ResourceTagMappingList: [{ ResourceARN: 'aws:rds:db/bar' }],
+          } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+        } else {
+          callback(
+            new Error(
+              `Unexpected ResourceTypeFilters = ${params.ResourceTypeFilters?.join(
+                ', ',
+              )}`,
+            ),
+            {},
+          );
+        }
       },
     );
 
@@ -374,27 +389,29 @@ describe('conserve', () => {
       ) => {
         callback(null, {
           DBInstances: [
-            { DBInstanceIdentifier: 'bar', DBInstanceStatus: 'available' },
+            {
+              DBInstanceArn: 'aws:rds:db/bar',
+              DBInstanceIdentifier: 'bar',
+              DBInstanceStatus: 'available',
+            },
           ],
         } as AWS.RDS.Types.DBInstanceMessage);
       },
     );
 
-    const updateTableSpy = jest
-      .fn()
-      .mockImplementationOnce((params, callback) => {
-        callback(new Error(`Failed ddb update`));
-      });
+    const updateTableSpy = jest.fn().mockImplementation((params, callback) => {
+      callback(new Error(`Failed ddb update`));
+    });
     const stopDBInstanceSpy = jest
       .fn()
-      .mockImplementationOnce((params, callback) => {
+      .mockImplementation((params, callback) => {
         callback(null, {});
       });
 
     AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
     AWSMock.mock('RDS', 'stopDBInstance', stopDBInstanceSpy);
 
-    jest.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
+    jest.spyOn(fs, 'existsSync').mockReturnValue(false);
 
     await expect(async () =>
       runConserve([
@@ -528,9 +545,24 @@ describe('conserve', () => {
         params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
         callback: Function,
       ) => {
-        callback(null, {
-          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
-        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+        if (params.ResourceTypeFilters?.includes('dynamodb:table')) {
+          callback(null, {
+            ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+          } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+        } else if (params.ResourceTypeFilters?.includes('rds:db')) {
+          callback(null, {
+            ResourceTagMappingList: [{ ResourceARN: 'aws:rds:db/bar' }],
+          } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+        } else {
+          callback(
+            new Error(
+              `Unexpected ResourceTypeFilters = ${params.ResourceTypeFilters?.join(
+                ', ',
+              )}`,
+            ),
+            {},
+          );
+        }
       },
     );
 
@@ -571,20 +603,22 @@ describe('conserve', () => {
       ) => {
         callback(null, {
           DBInstances: [
-            { DBInstanceIdentifier: 'bar', DBInstanceStatus: 'available' },
+            {
+              DBInstanceArn: 'aws:rds:db/bar',
+              DBInstanceIdentifier: 'bar',
+              DBInstanceStatus: 'available',
+            },
           ],
         } as AWS.RDS.Types.DBInstanceMessage);
       },
     );
 
-    const updateTableSpy = jest
-      .fn()
-      .mockImplementationOnce((params, callback) => {
-        callback(new Error(`Failed ddb update`));
-      });
+    const updateTableSpy = jest.fn().mockImplementation((params, callback) => {
+      callback(new Error(`Failed ddb update`));
+    });
     const stopDBInstanceSpy = jest
       .fn()
-      .mockImplementationOnce((params, callback) => {
+      .mockImplementation((params, callback) => {
         callback(new Error(`Failed stop instance`));
       });
 
@@ -602,6 +636,9 @@ describe('conserve', () => {
         'stop-rds-database-instances',
       ]),
     ).rejects.toThrowError('ConserveFailure');
+
+    expect(updateTableSpy).toHaveBeenCalledTimes(1);
+    expect(stopDBInstanceSpy).toHaveBeenCalledTimes(1);
 
     AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');

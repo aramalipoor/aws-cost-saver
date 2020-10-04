@@ -1,7 +1,7 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
-import { TagFilterList } from 'aws-sdk/clients/resourcegroupstaggingapi';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
 import { TrickInterface } from '../types/trick.interface';
 import { TrickOptionsInterface } from '../types/trick-options.interface';
@@ -17,8 +17,11 @@ export class StopRdsDatabaseInstancesTrick
 
   private rdsClient: AWS.RDS;
 
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
+
   constructor() {
     this.rdsClient = new AWS.RDS();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
@@ -30,7 +33,25 @@ export class StopRdsDatabaseInstancesTrick
     task: ListrTaskWrapper<any, any>,
     options: TrickOptionsInterface,
   ): Promise<void> {
-    task.skip(`ignored, no need to prepare tags`);
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['rds:db'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
   }
 
   async getCurrentState(
@@ -60,7 +81,7 @@ export class StopRdsDatabaseInstancesTrick
           return {
             title:
               database.DBInstanceIdentifier || chalk.italic('<no-identifier>'),
-            task: async () => {
+            task: async (ctx, task) => {
               if (database.DBInstanceIdentifier === undefined) {
                 throw new Error(
                   `Unexpected error: DBInstanceIdentifier is missing for RDS database`,
@@ -71,6 +92,13 @@ export class StopRdsDatabaseInstancesTrick
                 throw new Error(
                   `Unexpected error: DBInstanceStatus is missing for RDS database`,
                 );
+              }
+
+              if (
+                !this.isArnIncluded(context, database.DBInstanceArn as string)
+              ) {
+                task.skip(`ignored, due to tag filters`);
+                return;
               }
 
               currentState.push({
@@ -233,9 +261,6 @@ export class StopRdsDatabaseInstancesTrick
         (
           await this.rdsClient
             .describeDBInstances({
-              Filters:
-                options.tags &&
-                StopRdsDatabaseInstancesTrick.prepareFilters(options.tags),
               MaxRecords: 100,
             })
             .promise()
@@ -247,7 +272,11 @@ export class StopRdsDatabaseInstancesTrick
     return databases;
   }
 
-  private static prepareFilters(tags: TagFilterList): AWS.RDS.FilterList {
-    return tags.map(t => ({ Name: `tag:${t.Key}`, Values: t.Values || [] }));
+  private isArnIncluded(context: TrickContext, arn: string): boolean {
+    return Boolean(
+      context.resourceTagMappings?.find(
+        rm => (rm.ResourceARN as string) === arn,
+      ),
+    );
   }
 }

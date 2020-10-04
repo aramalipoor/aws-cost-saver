@@ -34,6 +34,9 @@ AWS Cost Saver
       : chalk.green(flags['state-file'])
   }
   Dry run: ${flags['dry-run'] ? chalk.green('yes') : chalk.yellow('no')}
+  Tags: ${
+    flags.tag ? chalk.blue(flags.tag) : chalk.yellow(chalk.italic('none'))
+  }
 `);
 
     if (flags['only-summary']) {
@@ -123,15 +126,18 @@ AWS Cost Saver
     level = 0,
   ) {
     for (const task of tasks) {
-      if (task.cleanTitle?.toString().includes('prepare tags')) {
-        continue;
+      const cleanTitle = task.cleanTitle?.toString() || '';
+
+      if (
+        cleanTitle.includes('prepare tags') ||
+        cleanTitle.includes('fetch current state')
+      ) {
+        // if (this.collectErrors(task.subtasks).length === 0) {
+        //   continue;
+        // }
       }
 
-      if (task.cleanTitle?.toString().includes('fetch current state')) {
-        continue;
-      }
-
-      if (!task.cleanTitle?.toString().includes('conserve resources')) {
+      if (!cleanTitle.includes('conserve resources')) {
         this.consoleWriteLine(
           `${' '.repeat(level)}${
             task.isSkipped()

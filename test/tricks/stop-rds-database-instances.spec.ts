@@ -10,6 +10,8 @@ import {
 } from '../../src/tricks/stop-rds-database-instances.trick';
 import { TrickContext } from '../../src/types/trick-context';
 import { RdsDatabaseState } from '../../src/states/rds-database.state';
+import { TrickOptionsInterface } from '../../src/types/trick-options.interface';
+
 import { createMockTask } from '../util';
 
 beforeAll(async done => {
@@ -50,12 +52,37 @@ describe('stop-rds-database-instances', () => {
     );
   });
 
-  it('skips preparing tags', async () => {
+  it('prepares resource tags', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [
+            { ResourceARN: 'arn:rds:cluster/foo' },
+            { ResourceARN: 'arn:rds:cluster/bar' },
+          ],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
+
     const instance = new StopRdsDatabaseInstancesTrick();
-    await instance.prepareTags({} as TrickContext, task, {
-      dryRun: false,
+    const trickContext: TrickContext = {};
+    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+
+    expect(trickContext).toMatchObject({
+      resourceTagMappings: [
+        { ResourceARN: 'arn:rds:cluster/foo' },
+        { ResourceARN: 'arn:rds:cluster/bar' },
+      ],
     });
-    expect(task.skip).toBeCalled();
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
   });
 
   it('returns an empty Listr if no databases found', async () => {
@@ -216,7 +243,11 @@ describe('stop-rds-database-instances', () => {
       ) => {
         callback(null, {
           DBInstances: [
-            { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'available' },
+            {
+              DBInstanceArn: 'aws:rds:db/bar',
+              DBInstanceIdentifier: 'bar',
+              DBInstanceStatus: 'available',
+            },
           ],
         } as AWS.RDS.Types.DBInstanceMessage);
       },
@@ -225,7 +256,9 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
+      {
+        resourceTagMappings: [{ ResourceARN: 'aws:rds:db/bar' }],
+      } as TrickContext,
       task,
       stateObject,
       {
@@ -238,7 +271,7 @@ describe('stop-rds-database-instances', () => {
     expect(stateObject).toStrictEqual(
       expect.objectContaining([
         {
-          identifier: 'foo',
+          identifier: 'bar',
           status: 'available',
         } as RdsDatabaseState,
       ]),
@@ -250,48 +283,50 @@ describe('stop-rds-database-instances', () => {
   it('generates state object for tagged resources', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const describeDBInstancesSpy = jest
-      .fn()
-      .mockImplementationOnce(
-        (
-          params: AWS.RDS.Types.DescribeDBInstancesMessage,
-          callback: Function,
-        ) => {
-          callback(null, {
-            DBInstances: [
-              { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'available' },
-            ],
-          } as AWS.RDS.Types.DBInstanceMessage);
-        },
-      );
-    AWSMock.mock('RDS', 'describeDBInstances', describeDBInstancesSpy);
+    AWSMock.mock(
+      'RDS',
+      'describeDBInstances',
+      (
+        params: AWS.RDS.Types.DescribeDBInstancesMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          DBInstances: [
+            {
+              DBInstanceArn: 'arn:rds:db/foo',
+              DBInstanceIdentifier: 'foo',
+              DBInstanceStatus: 'available',
+            },
+            {
+              DBInstanceArn: 'arn:rds:db/bar',
+              DBInstanceIdentifier: 'bar',
+              DBInstanceStatus: 'available',
+            },
+          ],
+        } as AWS.RDS.Types.DBInstanceMessage);
+      },
+    );
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:rds:db/bar' }],
+      } as TrickContext,
       task,
       stateObject,
       {
-        tags: [{ Key: 'Team', Values: ['Tacos'] }],
         dryRun: false,
       },
     );
 
     await listr.run({});
 
-    expect(describeDBInstancesSpy).toBeCalledWith(
-      expect.objectContaining({
-        Filters: [{ Name: 'tag:Team', Values: ['Tacos'] }],
-        MaxRecords: 100,
-      } as AWS.RDS.Types.DescribeDBInstancesMessage),
-      expect.any(Function),
-    );
     expect(stateObject.length).toBe(1);
     expect(stateObject).toStrictEqual(
       expect.objectContaining([
         {
-          identifier: 'foo',
+          identifier: 'bar',
           status: 'available',
         } as RdsDatabaseState,
       ]),
@@ -312,8 +347,13 @@ describe('stop-rds-database-instances', () => {
       ) => {
         callback(null, {
           DBInstances: [
-            { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'available' },
             {
+              DBInstanceArn: 'aws:rds:db/foo',
+              DBInstanceIdentifier: 'foo',
+              DBInstanceStatus: 'available',
+            },
+            {
+              DBInstanceArn: 'aws:rds:db/zoo',
               DBInstanceIdentifier: 'zoo',
               DBInstanceStatus: 'available',
               DBClusterIdentifier: 'qux',
@@ -326,7 +366,9 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
+      {
+        resourceTagMappings: [{ ResourceARN: 'aws:rds:db/foo' }],
+      } as TrickContext,
       task,
       stateObject,
       {
@@ -361,7 +403,11 @@ describe('stop-rds-database-instances', () => {
       ) => {
         callback(null, {
           DBInstances: [
-            { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'stopped' },
+            {
+              DBInstanceArn: 'aws:rds:db/foo',
+              DBInstanceIdentifier: 'foo',
+              DBInstanceStatus: 'stopped',
+            },
           ],
         } as AWS.RDS.Types.DBInstanceMessage);
       },
@@ -370,7 +416,9 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
+      {
+        resourceTagMappings: [{ ResourceARN: 'aws:rds:db/foo' }],
+      } as TrickContext,
       task,
       stateObject,
       {

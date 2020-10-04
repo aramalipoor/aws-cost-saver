@@ -1,7 +1,7 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
-import { TagFilterList } from 'aws-sdk/clients/resourcegroupstaggingapi';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
 import { TrickInterface } from '../types/trick.interface';
 import { TrickOptionsInterface } from '../types/trick-options.interface';
@@ -17,8 +17,11 @@ export class StopRdsDatabaseClustersTrick
 
   private rdsClient: AWS.RDS;
 
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
+
   constructor() {
     this.rdsClient = new AWS.RDS();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
@@ -30,7 +33,25 @@ export class StopRdsDatabaseClustersTrick
     task: ListrTaskWrapper<any, any>,
     options: TrickOptionsInterface,
   ): Promise<void> {
-    task.skip(`ignored, no need to prepare tags`);
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['rds:cluster'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
   }
 
   async getCurrentState(
@@ -60,7 +81,7 @@ export class StopRdsDatabaseClustersTrick
           return {
             title:
               cluster.DBClusterIdentifier || chalk.italic('<no-identifier>'),
-            task: async () => {
+            task: async (ctx, task) => {
               if (cluster.DBClusterIdentifier === undefined) {
                 throw new Error(
                   `Unexpected error: DBClusterIdentifier is missing for RDS cluster`,
@@ -71,6 +92,13 @@ export class StopRdsDatabaseClustersTrick
                 throw new Error(
                   `Unexpected error: Status is missing for RDS cluster`,
                 );
+              }
+
+              if (
+                !this.isArnIncluded(context, cluster.DBClusterArn as string)
+              ) {
+                task.skip(`ignored, due to tag filters`);
+                return;
               }
 
               currentState.push({
@@ -234,9 +262,6 @@ export class StopRdsDatabaseClustersTrick
       ...(((
         await this.rdsClient
           .describeDBClusters({
-            Filters:
-              options.tags &&
-              StopRdsDatabaseClustersTrick.prepareFilters(options.tags),
             MaxRecords: 100,
           })
           .promise()
@@ -247,7 +272,11 @@ export class StopRdsDatabaseClustersTrick
     return clusters;
   }
 
-  private static prepareFilters(tags: TagFilterList): AWS.RDS.FilterList {
-    return tags.map(t => ({ Name: `tag:${t.Key}`, Values: t.Values as [] }));
+  private isArnIncluded(context: TrickContext, arn: string): boolean {
+    return Boolean(
+      context.resourceTagMappings?.find(
+        rm => (rm.ResourceARN as string) === arn,
+      ),
+    );
   }
 }

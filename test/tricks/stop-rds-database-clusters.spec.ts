@@ -10,6 +10,7 @@ import {
 } from '../../src/tricks/stop-rds-database-clusters.trick';
 import { TrickContext } from '../../src/types/trick-context';
 import { RdsClusterState } from '../../src/states/rds-cluster.state';
+import { TrickOptionsInterface } from '../../src/types/trick-options.interface';
 
 import { createMockTask } from '../util';
 
@@ -51,12 +52,37 @@ describe('stop-rds-database-clusters', () => {
     );
   });
 
-  it('skips preparing tags', async () => {
+  it('prepares resource tags', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [
+            { ResourceARN: 'arn:rds:cluster/foo' },
+            { ResourceARN: 'arn:rds:cluster/bar' },
+          ],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
+
     const instance = new StopRdsDatabaseClustersTrick();
-    await instance.prepareTags({} as TrickContext, task, {
-      dryRun: false,
+    const trickContext: TrickContext = {};
+    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+
+    expect(trickContext).toMatchObject({
+      resourceTagMappings: [
+        { ResourceARN: 'arn:rds:cluster/foo' },
+        { ResourceARN: 'arn:rds:cluster/bar' },
+      ],
     });
-    expect(task.skip).toBeCalled();
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
   });
 
   it('returns an empty Listr if no databases found', async () => {
@@ -201,7 +227,13 @@ describe('stop-rds-database-clusters', () => {
       'describeDBClusters',
       (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBClusters: [{ DBClusterIdentifier: 'foo', Status: 'available' }],
+          DBClusters: [
+            {
+              DBClusterArn: 'arn:rds:cluster/foo',
+              DBClusterIdentifier: 'foo',
+              Status: 'available',
+            },
+          ],
         } as AWS.RDS.Types.DBClusterMessage);
       },
     );
@@ -209,7 +241,9 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/foo' }],
+      } as TrickContext,
       task,
       stateObject,
       {
@@ -234,24 +268,33 @@ describe('stop-rds-database-clusters', () => {
   it('generates state object for tagged resources', async () => {
     AWSMock.setSDKInstance(AWS);
 
-    const describeDBClustersSpy = jest
-      .fn()
-      .mockImplementationOnce(
-        (
-          params: AWS.RDS.Types.DescribeDBClustersMessage,
-          callback: Function,
-        ) => {
-          callback(null, {
-            DBClusters: [{ DBClusterIdentifier: 'foo', Status: 'available' }],
-          } as AWS.RDS.Types.DBClusterMessage);
-        },
-      );
-    AWSMock.mock('RDS', 'describeDBClusters', describeDBClustersSpy);
+    AWSMock.mock(
+      'RDS',
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
+        callback(null, {
+          DBClusters: [
+            {
+              DBClusterArn: 'arn:rds:cluster/foo',
+              DBClusterIdentifier: 'foo',
+              Status: 'available',
+            },
+            {
+              DBClusterArn: 'arn:rds:cluster/bar',
+              DBClusterIdentifier: 'bar',
+              Status: 'available',
+            },
+          ],
+        } as AWS.RDS.Types.DBClusterMessage);
+      },
+    );
 
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/bar' }],
+      } as TrickContext,
       task,
       stateObject,
       {
@@ -262,18 +305,11 @@ describe('stop-rds-database-clusters', () => {
 
     await listr.run({});
 
-    expect(describeDBClustersSpy).toBeCalledWith(
-      expect.objectContaining({
-        Filters: [{ Name: 'tag:Team', Values: ['Tacos'] }],
-        MaxRecords: 100,
-      } as AWS.RDS.Types.DescribeDBInstancesMessage),
-      expect.any(Function),
-    );
     expect(stateObject.length).toBe(1);
     expect(stateObject).toStrictEqual(
       expect.objectContaining([
         {
-          identifier: 'foo',
+          identifier: 'bar',
           status: 'available',
         } as RdsClusterState,
       ]),
@@ -290,7 +326,13 @@ describe('stop-rds-database-clusters', () => {
       'describeDBClusters',
       (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBClusters: [{ DBClusterIdentifier: 'foo', Status: 'stopped' }],
+          DBClusters: [
+            {
+              DBClusterArn: 'arn:rds:cluster/foo',
+              DBClusterIdentifier: 'foo',
+              Status: 'stopped',
+            },
+          ],
         } as AWS.RDS.Types.DBClusterMessage);
       },
     );
@@ -298,7 +340,9 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/foo' }],
+      } as TrickContext,
       task,
       stateObject,
       {

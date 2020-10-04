@@ -63,6 +63,7 @@ export default class Conserve extends BaseCommand {
     `$ aws-cost-saver conserve ${chalk.yellow('--dry-run')}`,
     `$ aws-cost-saver conserve ${chalk.yellow('--no-state-file')}`,
     `$ aws-cost-saver conserve ${chalk.yellow('--only-summary')}`,
+    `$ aws-cost-saver conserve ${chalk.yellow('-d -n -m -t Team=Tacos')}`,
     `$ aws-cost-saver conserve ${chalk.yellow(
       `--use-trick ${chalk.bold(
         SnapshotRemoveElasticacheRedisTrick.machineName,
@@ -166,8 +167,17 @@ export default class Conserve extends BaseCommand {
     for (const trick of tricks) {
       rootTaskList.push({
         title: `${chalk.dim(`conserve:`)} ${trick.getMachineName()}`,
-        task: (ctx, task) =>
-          this.createTrickListr(task, rootState, trick, options),
+        task: (ctx, task) => {
+          ctx[trick.getMachineName()] = {};
+          rootState[trick.getMachineName()] = [];
+
+          return this.createTrickListr(
+            task,
+            rootState[trick.getMachineName()],
+            trick,
+            options,
+          );
+        },
       });
     }
 
@@ -226,32 +236,30 @@ export default class Conserve extends BaseCommand {
 
   private createTrickListr(
     task: ListrTaskWrapper<any, any>,
-    rootState: RootState,
+    state: any,
     trick: TrickInterface<any>,
     options: TrickOptionsInterface,
   ): Listr<any, any, any> {
-    rootState[trick.getMachineName()] = [];
-
     return task.newListr(
       [
         {
           title: 'prepare tags',
-          task: (ctx, task) => trick.prepareTags(ctx, task, options),
+          task: (ctx, task) =>
+            trick.prepareTags(ctx[trick.getMachineName()], task, options),
         },
         {
           title: 'fetch current state',
           task: (ctx, task) =>
             trick.getCurrentState(
-              ctx,
+              ctx[trick.getMachineName()],
               task,
-              rootState[trick.getMachineName()],
+              state,
               options,
             ),
         },
         {
           title: 'conserve resources',
-          task: (ctx, task) =>
-            trick.conserve(task, rootState[trick.getMachineName()], options),
+          task: (ctx, task) => trick.conserve(task, state, options),
         },
       ],
       {
