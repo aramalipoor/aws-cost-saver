@@ -37,7 +37,7 @@ $ aws-cost-saver conserve --help
 $ aws-cost-saver conserve --dry-run --no-state-file
 $ aws-cost-saver conserve --dry-run --no-state-file --only-summary
 $ aws-cost-saver conserve -d -n --tag Team=Tacos
-$ aws-cost-saver conserve -d -n --tag Team=Tacos --tag Application=Orders
+$ aws-cost-saver conserve -d -n -t Team=Tacos -t Application=Orders
 
 # Use
 $ aws-cost-saver conserve
