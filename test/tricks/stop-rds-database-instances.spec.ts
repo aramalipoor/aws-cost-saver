@@ -73,7 +73,7 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const trickContext: TrickContext = {};
-    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
 
     expect(trickContext).toMatchObject({
       resourceTagMappings: [
@@ -104,8 +104,8 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -134,8 +134,8 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -166,8 +166,8 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -208,8 +208,8 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -256,10 +256,10 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'aws:rds:db/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -310,10 +310,10 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:rds:db/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -366,10 +366,10 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'aws:rds:db/foo' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -416,10 +416,10 @@ describe('stop-rds-database-instances', () => {
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'aws:rds:db/foo' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,

@@ -48,7 +48,7 @@ describe('suspend-auto-scaling-groups', () => {
 
   it('skips preparing tags', async () => {
     const instance = new SuspendAutoScalingGroupsTrick();
-    await instance.prepareTags({} as TrickContext, task, {
+    await instance.prepareTags(task, {} as TrickContext, {
       dryRun: false,
     });
     expect(task.skip).toBeCalled();
@@ -73,8 +73,8 @@ describe('suspend-auto-scaling-groups', () => {
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [];
     await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -109,8 +109,8 @@ describe('suspend-auto-scaling-groups', () => {
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [];
     await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -159,8 +159,8 @@ describe('suspend-auto-scaling-groups', () => {
     const instance = new SuspendAutoScalingGroupsTrick();
     const stateObject: SuspendAutoScalingGroupsState = [];
     await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         tags: [{ Key: 'Team', Values: ['Tacos'] }],

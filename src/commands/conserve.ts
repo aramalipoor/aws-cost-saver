@@ -25,7 +25,9 @@ import { ScaledownAutoScalingGroupsTrick } from '../tricks/scaledown-auto-scalin
 import { SuspendAutoScalingGroupsTrick } from '../tricks/suspend-auto-scaling-groups.trick';
 
 import { RootState } from '../types/root-state';
+import { RootContext } from '../types/root-context';
 import { TrickOptionsInterface } from '../types/trick-options.interface';
+import { TrickContext } from '../types/trick-context';
 
 export default class Conserve extends BaseCommand {
   static tricksEnabledByDefault: readonly string[] = [
@@ -157,6 +159,7 @@ export default class Conserve extends BaseCommand {
     this.printBanner(awsConfig, flags);
 
     const tricks = this.getEnabledTricks(flags);
+    const rootContext: RootContext = {};
     const rootState: RootState = {};
     const rootTaskList: ListrTask[] = [];
     const options: TrickOptionsInterface = {
@@ -168,15 +171,16 @@ export default class Conserve extends BaseCommand {
       rootTaskList.push({
         title: `${chalk.dim(`conserve:`)} ${trick.getMachineName()}`,
         task: (ctx, task) => {
-          ctx[trick.getMachineName()] = {};
+          rootContext[trick.getMachineName()] = {};
           rootState[trick.getMachineName()] = [];
 
-          return this.createTrickListr(
-            task,
-            rootState[trick.getMachineName()],
-            trick,
-            options,
-          );
+          return this.createTrickListr({
+            trickTask: task,
+            trickContext: rootContext[trick.getMachineName()],
+            trickState: rootState[trick.getMachineName()],
+            trickInstance: trick,
+            trickOptions: options,
+          });
         },
       });
     }
@@ -193,7 +197,7 @@ export default class Conserve extends BaseCommand {
       },
     } as ListrDefaultRendererOptions<any>);
 
-    await listr.run();
+    await listr.run(rootContext);
     this.renderSummary(listr.tasks);
 
     if (!flags['no-state-file']) {
@@ -234,32 +238,38 @@ export default class Conserve extends BaseCommand {
     }
   }
 
-  private createTrickListr(
-    task: ListrTaskWrapper<any, any>,
-    state: any,
-    trick: TrickInterface<any>,
-    options: TrickOptionsInterface,
-  ): Listr<any, any, any> {
-    return task.newListr(
+  private createTrickListr(cfg: {
+    trickTask: ListrTaskWrapper<any, any>;
+    trickContext: TrickContext;
+    trickState: Record<string, any>[];
+    trickInstance: TrickInterface<any>;
+    trickOptions: TrickOptionsInterface;
+  }): Listr<any, any, any> {
+    return cfg.trickTask.newListr(
       [
         {
           title: 'prepare tags',
           task: (ctx, task) =>
-            trick.prepareTags(ctx[trick.getMachineName()], task, options),
+            cfg.trickInstance.prepareTags(
+              task,
+              cfg.trickContext,
+              cfg.trickOptions,
+            ),
         },
         {
           title: 'fetch current state',
           task: (ctx, task) =>
-            trick.getCurrentState(
-              ctx[trick.getMachineName()],
+            cfg.trickInstance.getCurrentState(
               task,
-              state,
-              options,
+              cfg.trickContext,
+              cfg.trickState,
+              cfg.trickOptions,
             ),
         },
         {
           title: 'conserve resources',
-          task: (ctx, task) => trick.conserve(task, state, options),
+          task: (ctx, task) =>
+            cfg.trickInstance.conserve(task, cfg.trickState, cfg.trickOptions),
         },
       ],
       {

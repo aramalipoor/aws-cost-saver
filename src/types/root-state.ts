@@ -1,3 +1,3 @@
 export type RootState = {
-  [trickName: string]: Record<string, any>;
+  [trickName: string]: Record<string, any>[];
 };

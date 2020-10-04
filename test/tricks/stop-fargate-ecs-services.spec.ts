@@ -71,7 +71,7 @@ describe('stop-fargate-ecs-services', () => {
 
     const instance = new StopFargateEcsServicesTrick();
     const trickContext: TrickContext = {};
-    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
 
     expect(trickContext).toMatchObject({
       resourceTagMappings: [
@@ -99,8 +99,8 @@ describe('stop-fargate-ecs-services', () => {
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -146,8 +146,8 @@ describe('stop-fargate-ecs-services', () => {
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
     const stateListr = await instance.getCurrentState(
-      {} as TrickContext,
       task,
+      {} as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -207,8 +207,8 @@ describe('stop-fargate-ecs-services', () => {
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -362,6 +362,7 @@ describe('stop-fargate-ecs-services', () => {
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [
           { ResourceARN: 'arn:service/baz' },
@@ -369,7 +370,6 @@ describe('stop-fargate-ecs-services', () => {
           { ResourceARN: 'arn:cluster/bar' },
         ],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -530,13 +530,13 @@ describe('stop-fargate-ecs-services', () => {
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [
           { ResourceARN: 'arn:service/baz' },
           { ResourceARN: 'arn:cluster/bar' },
         ],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,

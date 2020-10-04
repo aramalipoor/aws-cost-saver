@@ -124,8 +124,8 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -158,7 +158,7 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const trickContext: TrickContext = {};
-    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
 
     expect(trickContext).toMatchObject({
       resourceTagMappings: [
@@ -205,8 +205,8 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -267,8 +267,8 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -335,10 +335,10 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:elasticachecluster/foo' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -424,10 +424,10 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -553,12 +553,12 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [
           { ResourceARN: 'arn:elasticachecluster/bar-member' },
         ],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -641,10 +641,10 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -756,10 +756,10 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -875,10 +875,10 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -1002,10 +1002,10 @@ describe('snapshot-remove-elasticache-redis', () => {
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,

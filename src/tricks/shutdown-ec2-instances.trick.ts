@@ -26,17 +26,17 @@ export class ShutdownEC2InstancesTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     task.skip(`ignored, no need to prepare tags`);
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: ShutdownEC2InstancesState,
+    context: TrickContext,
+    state: ShutdownEC2InstancesState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const reservations = await this.listReservations(task, options);
@@ -86,7 +86,7 @@ export class ShutdownEC2InstancesTrick
                   name: nameTag,
                 };
 
-                currentState.push(instanceState);
+                state.push(instanceState);
               },
               options: {
                 persistentOutput: true,

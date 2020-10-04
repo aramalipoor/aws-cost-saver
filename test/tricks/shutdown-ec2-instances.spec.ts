@@ -51,7 +51,7 @@ describe('shutdown-ec2-instances', () => {
 
   it('skips preparing tags', async () => {
     const instance = new ShutdownEC2InstancesTrick();
-    await instance.prepareTags({} as TrickContext, task, {
+    await instance.prepareTags(task, {} as TrickContext, {
       dryRun: false,
     });
     expect(task.skip).toBeCalled();
@@ -73,8 +73,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -102,8 +102,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -129,8 +129,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -158,8 +158,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -197,8 +197,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -238,8 +238,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -298,8 +298,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -364,8 +364,8 @@ describe('shutdown-ec2-instances', () => {
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         tags: [{ Key: 'Name', Values: ['barname'] }],

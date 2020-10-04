@@ -31,17 +31,17 @@ export class RemoveNatGatewaysTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     task.skip(`ignored, no need to prepare tags`);
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: RemoveNatGatewaysState,
+    context: TrickContext,
+    state: RemoveNatGatewaysState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const natGateways = await this.listNatGateways(task, options);
@@ -85,7 +85,7 @@ export class RemoveNatGatewaysTrick
               task.output = 'finding routes...';
               const routes = await this.findRoutes(natGateway);
 
-              currentState.push({
+              state.push({
                 id: natGateway.NatGatewayId,
                 vpcId: natGateway.VpcId,
                 subnetId: natGateway.SubnetId,

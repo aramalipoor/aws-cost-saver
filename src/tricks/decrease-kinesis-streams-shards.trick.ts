@@ -29,10 +29,10 @@ export class DecreaseKinesisStreamsShardsTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     const resourceTagMappings: ResourceTagMappingList = [];
 
     // TODO Add logic to go through all pages
@@ -55,9 +55,9 @@ export class DecreaseKinesisStreamsShardsTrick
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: DecreaseKinesisStreamsShardsState,
+    context: TrickContext,
+    state: DecreaseKinesisStreamsShardsState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const streamNames = await this.listKinesisStreamsNames(task);
@@ -90,7 +90,7 @@ export class DecreaseKinesisStreamsShardsTrick
             };
           }
 
-          currentState.push(streamState);
+          state.push(streamState);
           return {
             title: streamName,
             task: async (ctx, task) => this.getStreamState(task, streamState),

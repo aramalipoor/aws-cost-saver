@@ -50,7 +50,7 @@ describe('remove-nat-gateways', () => {
 
   it('skips preparing tags', async () => {
     const instance = new RemoveNatGatewaysTrick();
-    await instance.prepareTags({} as TrickContext, task, {
+    await instance.prepareTags(task, {} as TrickContext, {
       dryRun: false,
     });
     expect(task.skip).toBeCalled();
@@ -75,8 +75,8 @@ describe('remove-nat-gateways', () => {
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -148,8 +148,8 @@ describe('remove-nat-gateways', () => {
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -263,8 +263,8 @@ describe('remove-nat-gateways', () => {
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -377,8 +377,8 @@ describe('remove-nat-gateways', () => {
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,

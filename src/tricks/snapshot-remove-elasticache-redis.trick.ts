@@ -29,10 +29,10 @@ export class SnapshotRemoveElasticacheRedisTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     const resourceTagMappings: ResourceTagMappingList = [];
 
     // TODO Add logic to go through all pages
@@ -55,9 +55,9 @@ export class SnapshotRemoveElasticacheRedisTrick
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: SnapshotRemoveElasticacheRedisState,
+    context: TrickContext,
+    state: SnapshotRemoveElasticacheRedisState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const replicationGroups = await this.listReplicationGroups(task);
@@ -100,7 +100,7 @@ export class SnapshotRemoveElasticacheRedisTrick
               );
 
               if (changes) {
-                currentState.push({ ...replicationGroupState, ...changes });
+                state.push({ ...replicationGroupState, ...changes });
               }
             },
             options: {

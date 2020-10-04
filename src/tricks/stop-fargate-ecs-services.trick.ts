@@ -34,10 +34,10 @@ export class StopFargateEcsServicesTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     const resourceTagMappings: ResourceTagMappingList = [];
 
     // TODO Add logic to go through all pages
@@ -60,9 +60,9 @@ export class StopFargateEcsServicesTrick
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: StopFargateEcsServicesState,
+    context: TrickContext,
+    state: StopFargateEcsServicesState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const clustersArn = await this.listClusters(task);
@@ -87,7 +87,7 @@ export class StopFargateEcsServicesTrick
             arn: clusterArn,
             services: [],
           };
-          currentState.push(clusterState);
+          state.push(clusterState);
           return {
             title: clusterArn,
             task: async (ctx, task) =>

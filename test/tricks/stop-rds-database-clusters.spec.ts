@@ -73,7 +73,7 @@ describe('stop-rds-database-clusters', () => {
 
     const instance = new StopRdsDatabaseClustersTrick();
     const trickContext: TrickContext = {};
-    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
 
     expect(trickContext).toMatchObject({
       resourceTagMappings: [
@@ -101,8 +101,8 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -128,8 +128,8 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -157,8 +157,8 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -196,8 +196,8 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -241,10 +241,10 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/foo' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -292,10 +292,10 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         tags: [{ Key: 'Team', Values: ['Tacos'] }],
@@ -340,10 +340,10 @@ describe('stop-rds-database-clusters', () => {
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/foo' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,

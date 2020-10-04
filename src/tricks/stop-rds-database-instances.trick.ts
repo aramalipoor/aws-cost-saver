@@ -29,10 +29,10 @@ export class StopRdsDatabaseInstancesTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     const resourceTagMappings: ResourceTagMappingList = [];
 
     // TODO Add logic to go through all pages
@@ -55,9 +55,9 @@ export class StopRdsDatabaseInstancesTrick
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: StopRdsDatabaseInstancesState,
+    context: TrickContext,
+    state: StopRdsDatabaseInstancesState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const databases = await this.listDatabases(task, options);
@@ -101,7 +101,7 @@ export class StopRdsDatabaseInstancesTrick
                 return;
               }
 
-              currentState.push({
+              state.push({
                 identifier: database.DBInstanceIdentifier,
                 status: database.DBInstanceStatus,
               });

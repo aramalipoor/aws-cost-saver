@@ -29,10 +29,10 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     const resourceTagMappings: ResourceTagMappingList = [];
 
     // TODO Add logic to go through all pages
@@ -55,9 +55,9 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: DecreaseDynamoDBProvisionedRcuWcuState,
+    context: TrickContext,
+    state: DecreaseDynamoDBProvisionedRcuWcuState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const tableNames = await this.listTableNames(task);
@@ -90,7 +90,7 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
             };
           }
 
-          currentState.push(tableState);
+          state.push(tableState);
           return {
             title: tableName,
             task: async (ctx, task) => this.getTableState(task, tableState),

@@ -47,7 +47,7 @@ describe('scaledown-auto-scaling-groups', () => {
 
   it('skips preparing tags', async () => {
     const instance = new ScaledownAutoScalingGroupsTrick();
-    await instance.prepareTags({} as TrickContext, task, {
+    await instance.prepareTags(task, {} as TrickContext, {
       dryRun: false,
     });
     expect(task.skip).toBeCalled();
@@ -72,8 +72,8 @@ describe('scaledown-auto-scaling-groups', () => {
     const instance = new ScaledownAutoScalingGroupsTrick();
     const stateObject: ScaledownAutoScalingGroupsState = [];
     await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -111,8 +111,8 @@ describe('scaledown-auto-scaling-groups', () => {
     const instance = new ScaledownAutoScalingGroupsTrick();
     const stateObject: ScaledownAutoScalingGroupsState = [];
     await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -173,8 +173,8 @@ describe('scaledown-auto-scaling-groups', () => {
     const instance = new ScaledownAutoScalingGroupsTrick();
     const stateObject: ScaledownAutoScalingGroupsState = [];
     await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         tags: [{ Key: 'Team', Values: ['Tacos'] }],

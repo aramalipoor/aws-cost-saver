@@ -26,17 +26,17 @@ export class SuspendAutoScalingGroupsTrick
   }
 
   async prepareTags(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
     options: TrickOptionsInterface,
-  ): Promise<void> {
+  ): Promise<Listr | void> {
     task.skip(`ignored, no need to prepare tags`);
   }
 
   async getCurrentState(
-    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
-    currentState: SuspendAutoScalingGroupsState,
+    context: TrickContext,
+    state: SuspendAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     const scalingGroups = await this.listAutoScalingGroups(task);
@@ -49,7 +49,7 @@ export class SuspendAutoScalingGroupsTrick
       return;
     }
 
-    currentState.push(
+    state.push(
       ...filteredScalingGroups.map(
         (asg): AutoScalingGroupState => {
           return {

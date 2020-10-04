@@ -68,8 +68,8 @@ describe('decrease-kinesis-streams-shards', () => {
     const instance = new DecreaseKinesisStreamsShardsTrick();
     const stateObject: DecreaseKinesisStreamsShardsState = [];
     const listr = await instance.getCurrentState(
-      { resourceTagMappings: [] } as TrickContext,
       task,
+      { resourceTagMappings: [] } as TrickContext,
       stateObject,
       {
         dryRun: false,
@@ -102,7 +102,7 @@ describe('decrease-kinesis-streams-shards', () => {
 
     const instance = new DecreaseKinesisStreamsShardsTrick();
     const trickContext: TrickContext = {};
-    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
 
     expect(trickContext).toMatchObject({
       resourceTagMappings: [
@@ -147,10 +147,10 @@ describe('decrease-kinesis-streams-shards', () => {
     const instance = new DecreaseKinesisStreamsShardsTrick();
     const stateObject: DecreaseKinesisStreamsShardsState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:kinesis/foo' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
@@ -203,10 +203,10 @@ describe('decrease-kinesis-streams-shards', () => {
     const instance = new DecreaseKinesisStreamsShardsTrick();
     const stateObject: DecreaseKinesisStreamsShardsState = [];
     const listr = await instance.getCurrentState(
+      task,
       {
         resourceTagMappings: [{ ResourceARN: 'arn:kinesis/bar' }],
       } as TrickContext,
-      task,
       stateObject,
       {
         dryRun: false,
