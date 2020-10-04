@@ -7,7 +7,7 @@ import { ListrTaskObject } from 'listr2';
 import figures from 'figures';
 import * as Config from '@oclif/config';
 
-import { RootState } from './interfaces/root-state';
+import { RootState } from './types/root-state';
 import { StorageResolver } from './storage/storage.resolver';
 
 export default abstract class BaseCommand extends Command {
@@ -123,6 +123,10 @@ AWS Cost Saver
     level = 0,
   ) {
     for (const task of tasks) {
+      if (task.cleanTitle?.toString().includes('prepare tags')) {
+        continue;
+      }
+
       if (task.cleanTitle?.toString().includes('fetch current state')) {
         continue;
       }

@@ -2,14 +2,20 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import {
   ShutdownEC2InstancesTrick,
   ShutdownEC2InstancesState,
 } from '../../src/tricks/shutdown-ec2-instances.trick';
+import { TrickContext } from '../../src/types/trick-context';
 import { createMockTask } from '../util';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters at the moment
   AWS.EC2.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
@@ -17,6 +23,16 @@ beforeAll(async done => {
 
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('shutdown-ec2-instances', () => {
@@ -31,6 +47,14 @@ describe('shutdown-ec2-instances', () => {
     expect(instance.getMachineName()).toBe(
       ShutdownEC2InstancesTrick.machineName,
     );
+  });
+
+  it('skips preparing tags', async () => {
+    const instance = new ShutdownEC2InstancesTrick();
+    await instance.prepareTags({} as TrickContext, task, {
+      dryRun: false,
+    });
+    expect(task.skip).toBeCalled();
   });
 
   it('returns an empty Listr if no instances found', async () => {
@@ -48,9 +72,14 @@ describe('shutdown-ec2-instances', () => {
 
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -72,9 +101,14 @@ describe('shutdown-ec2-instances', () => {
 
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -94,9 +128,14 @@ describe('shutdown-ec2-instances', () => {
 
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -118,9 +157,14 @@ describe('shutdown-ec2-instances', () => {
 
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -152,9 +196,14 @@ describe('shutdown-ec2-instances', () => {
 
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -188,9 +237,14 @@ describe('shutdown-ec2-instances', () => {
 
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -243,9 +297,14 @@ describe('shutdown-ec2-instances', () => {
 
     const instance = new ShutdownEC2InstancesTrick();
     const stateObject: ShutdownEC2InstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -269,6 +328,66 @@ describe('shutdown-ec2-instances', () => {
         id: 'qux',
         state: 'running',
         name: 'quxname',
+      },
+    ] as ShutdownEC2InstancesState);
+
+    AWSMock.restore('EC2');
+  });
+
+  it('generates state object for tagged resources', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const describeInstancesSpy = jest
+      .fn()
+      .mockImplementationOnce(
+        (
+          params: AWS.EC2.Types.DescribeInstancesRequest,
+          callback: Function,
+        ) => {
+          callback(null, {
+            Reservations: [
+              {
+                Instances: [
+                  {
+                    InstanceId: 'bar',
+                    State: { Name: 'running' },
+                    Tags: [{ Value: 'barname', Key: 'Name' }],
+                  },
+                ],
+              },
+            ],
+          } as AWS.EC2.Types.DescribeInstancesResult);
+        },
+      );
+    AWSMock.mock('EC2', 'describeInstances', describeInstancesSpy);
+
+    const instance = new ShutdownEC2InstancesTrick();
+    const stateObject: ShutdownEC2InstancesState = [];
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        tags: [{ Key: 'Name', Values: ['barname'] }],
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(describeInstancesSpy).toBeCalledWith(
+      expect.objectContaining({
+        Filters: [{ Name: 'tag:Name', Values: ['barname'] }],
+        MaxResults: 1000,
+      } as AWS.EC2.Types.DescribeInstancesRequest),
+      expect.any(Function),
+    );
+    expect(stateObject.length).toBe(1);
+    expect(stateObject).toMatchObject([
+      {
+        id: 'bar',
+        state: 'running',
+        name: 'barname',
       },
     ] as ShutdownEC2InstancesState);
 

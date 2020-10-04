@@ -1,15 +1,15 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { Config } from '@oclif/config';
+import nock from 'nock';
 import { mockProcessStdout } from 'jest-mock-process';
 
 jest.mock('fs');
 import fs from 'fs';
 jest.mock('inquirer');
 import inquirer from 'inquirer';
-jest.mock('../../src/configure-aws');
-import { configureAWS } from '../../src/configure-aws';
 
+import * as util from '../../src/util';
 import Conserve from '../../src/commands/conserve';
 import { StopRdsDatabaseInstancesTrick } from '../../src/tricks/stop-rds-database-instances.trick';
 import { DecreaseDynamoDBProvisionedRcuWcuTrick } from '../../src/tricks/decrease-dynamodb-provisioned-rcu-wcu.trick';
@@ -22,24 +22,38 @@ async function runConserve(argv: string[]) {
 }
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   Conserve.tricksEnabledByDefault = [
     StopRdsDatabaseInstancesTrick.machineName,
     DecreaseDynamoDBProvisionedRcuWcuTrick.machineName,
   ];
   Conserve.tricksDisabledByDefault = [ShutdownEC2InstancesTrick.machineName];
 
-  done();
-});
-
-beforeEach(async () => {
-  jest.clearAllMocks();
-
-  (configureAWS as jest.Mock).mockImplementation(() => {
+  jest.spyOn(util, 'configureAWS').mockImplementation(() => {
     return Promise.resolve({
       region: 'eu-central-1',
       credentials: {},
     } as AWS.Config);
   });
+
+  done();
+});
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('conserve', () => {
@@ -47,6 +61,19 @@ describe('conserve', () => {
 
   it('ignores default tricks', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -102,11 +129,25 @@ describe('conserve', () => {
       expect.anything(),
     );
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
   });
 
   it('writes to state-file using default storage', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -172,11 +213,25 @@ describe('conserve', () => {
       expect.any(String),
     );
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
   });
 
   it('writes to state-file using s3 storage', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -261,12 +316,26 @@ describe('conserve', () => {
       expect.anything(),
     );
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
     AWSMock.restore('S3');
   });
 
   it('partially writes state-file if some tasks fail to conserve', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -366,12 +435,104 @@ describe('conserve', () => {
       expect.any(String),
     );
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
     AWSMock.restore('RDS');
   });
 
+  it('filters resources by tag', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const getResourcesSpy = jest
+      .fn()
+      .mockImplementationOnce(
+        (
+          params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+          callback: Function,
+        ) => {
+          callback(null, {
+            ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/bar' }],
+          } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+        },
+      );
+
+    AWSMock.mock('ResourceGroupsTaggingAPI', 'getResources', getResourcesSpy);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'listTables',
+      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
+        callback(null, { TableNames: ['foo', 'bar'] });
+      },
+    );
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'bar') {
+          callback(null, {
+            Table: {
+              TableName: params.TableName,
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 15,
+                ReadCapacityUnits: 17,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error(`Unexpected Table: ${params.TableName}`));
+        }
+      },
+    );
+
+    const updateTableSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+
+    AWSMock.mock('DynamoDB', 'updateTable', updateTableSpy);
+
+    jest.spyOn(fs, 'existsSync').mockReturnValueOnce(false);
+
+    await runConserve([
+      '--no-default-tricks',
+      '-u',
+      'decrease-dynamodb-provisioned-rcu-wcu',
+      '-t',
+      'Team=tacos',
+    ]);
+
+    expect(updateTableSpy).toHaveBeenCalledTimes(1);
+    expect(getResourcesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ResourcesPerPage: 100,
+        ResourceTypeFilters: ['dynamodb:table'],
+        TagFilters: [{ Key: 'Team', Values: ['tacos'] }],
+      }),
+      expect.any(Function),
+    );
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
+    AWSMock.restore('DynamoDB');
+  });
+
   it('errors if all tricks fail to conserve', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -442,12 +603,26 @@ describe('conserve', () => {
       ]),
     ).rejects.toThrowError('ConserveFailure');
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
     AWSMock.restore('RDS');
   });
 
   it('skips if dry-run option is passed', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -515,11 +690,25 @@ describe('conserve', () => {
       expect.any(String),
     );
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
   });
 
   it('ignores a specific trick', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'RDS',
@@ -592,12 +781,26 @@ describe('conserve', () => {
       expect.any(String),
     );
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
     AWSMock.restore('RDS');
   });
 
   it('fails if trick name is invalid', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     Conserve.tricksEnabledByDefault = [
       StopRdsDatabaseInstancesTrick.machineName,
@@ -617,6 +820,7 @@ describe('conserve', () => {
     expect(listTablesSpy).not.toHaveBeenCalled();
     expect(describeDBInstancesSpy).not.toHaveBeenCalled();
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
     AWSMock.restore('RDS');
   });
@@ -649,6 +853,19 @@ describe('conserve', () => {
 
   it('overwrites state-file if user chooses yes', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -692,11 +909,25 @@ describe('conserve', () => {
 
     expect(fs.writeFileSync).toHaveBeenCalled();
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
   });
 
   it('overwrites state-file if overwrite-state-file flag is provided', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -740,11 +971,25 @@ describe('conserve', () => {
     expect(fs.writeFileSync).toHaveBeenCalled();
     expect(promptSpy).not.toHaveBeenCalled();
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
   });
 
   it('uses silent renderer if only-summary flag is passed', async () => {
     AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [{ ResourceARN: 'aws:dynamodb/foo' }],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
 
     AWSMock.mock(
       'DynamoDB',
@@ -799,6 +1044,7 @@ describe('conserve', () => {
       expect.stringMatching(/conserve resources/gi),
     );
 
+    AWSMock.restore('ResourceGroupsTaggingAPI');
     AWSMock.restore('DynamoDB');
   });
 });

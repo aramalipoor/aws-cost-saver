@@ -1,19 +1,21 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { TagFilterList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { RdsClusterState } from '../states/rds-cluster.state';
+import { TrickContext } from '../types/trick-context';
 
 export type StopRdsDatabaseClustersState = RdsClusterState[];
 
 export class StopRdsDatabaseClustersTrick
   implements TrickInterface<StopRdsDatabaseClustersState> {
-  private rdsClient: AWS.RDS;
-
   static machineName = 'stop-rds-database-clusters';
+
+  private rdsClient: AWS.RDS;
 
   constructor() {
     this.rdsClient = new AWS.RDS();
@@ -23,12 +25,21 @@ export class StopRdsDatabaseClustersTrick
     return StopRdsDatabaseClustersTrick.machineName;
   }
 
+  async prepareTags(
+    context: TrickContext,
+    task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
+  ): Promise<void> {
+    task.skip(`ignored, no need to prepare tags`);
+  }
+
   async getCurrentState(
+    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
     currentState: StopRdsDatabaseClustersState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const clusters = await this.listClusters(task);
+    const clusters = await this.listClusters(task, options);
 
     const subListr = task.newListr([], {
       concurrent: 10,
@@ -213,6 +224,7 @@ export class StopRdsDatabaseClustersTrick
 
   private async listClusters(
     task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
   ): Promise<AWS.RDS.DBClusterList> {
     const clusters: AWS.RDS.DBClusterList = [];
 
@@ -222,6 +234,9 @@ export class StopRdsDatabaseClustersTrick
       ...(((
         await this.rdsClient
           .describeDBClusters({
+            Filters:
+              options.tags &&
+              StopRdsDatabaseClustersTrick.prepareFilters(options.tags),
             MaxRecords: 100,
           })
           .promise()
@@ -230,5 +245,9 @@ export class StopRdsDatabaseClustersTrick
 
     task.output = 'done';
     return clusters;
+  }
+
+  private static prepareFilters(tags: TagFilterList): AWS.RDS.FilterList {
+    return tags.map(t => ({ Name: `tag:${t.Key}`, Values: t.Values as [] }));
   }
 }

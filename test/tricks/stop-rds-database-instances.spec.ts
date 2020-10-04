@@ -2,15 +2,21 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import {
   StopRdsDatabaseInstancesTrick,
   StopRdsDatabaseInstancesState,
 } from '../../src/tricks/stop-rds-database-instances.trick';
+import { TrickContext } from '../../src/types/trick-context';
 import { RdsDatabaseState } from '../../src/states/rds-database.state';
 import { createMockTask } from '../util';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters at the moment
   AWS.RDS.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
@@ -18,6 +24,16 @@ beforeAll(async done => {
 
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('stop-rds-database-instances', () => {
@@ -32,6 +48,14 @@ describe('stop-rds-database-instances', () => {
     expect(instance.getMachineName()).toBe(
       StopRdsDatabaseInstancesTrick.machineName,
     );
+  });
+
+  it('skips preparing tags', async () => {
+    const instance = new StopRdsDatabaseInstancesTrick();
+    await instance.prepareTags({} as TrickContext, task, {
+      dryRun: false,
+    });
+    expect(task.skip).toBeCalled();
   });
 
   it('returns an empty Listr if no databases found', async () => {
@@ -52,9 +76,14 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -77,9 +106,14 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -104,9 +138,14 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -141,9 +180,14 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -180,12 +224,70 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
+    expect(stateObject).toStrictEqual(
+      expect.objectContaining([
+        {
+          identifier: 'foo',
+          status: 'available',
+        } as RdsDatabaseState,
+      ]),
+    );
+
+    AWSMock.restore('RDS');
+  });
+
+  it('generates state object for tagged resources', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const describeDBInstancesSpy = jest
+      .fn()
+      .mockImplementationOnce(
+        (
+          params: AWS.RDS.Types.DescribeDBInstancesMessage,
+          callback: Function,
+        ) => {
+          callback(null, {
+            DBInstances: [
+              { DBInstanceIdentifier: 'foo', DBInstanceStatus: 'available' },
+            ],
+          } as AWS.RDS.Types.DBInstanceMessage);
+        },
+      );
+    AWSMock.mock('RDS', 'describeDBInstances', describeDBInstancesSpy);
+
+    const instance = new StopRdsDatabaseInstancesTrick();
+    const stateObject: StopRdsDatabaseInstancesState = [];
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        tags: [{ Key: 'Team', Values: ['Tacos'] }],
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(describeDBInstancesSpy).toBeCalledWith(
+      expect.objectContaining({
+        Filters: [{ Name: 'tag:Team', Values: ['Tacos'] }],
+        MaxRecords: 100,
+      } as AWS.RDS.Types.DescribeDBInstancesMessage),
+      expect.any(Function),
+    );
+    expect(stateObject.length).toBe(1);
     expect(stateObject).toStrictEqual(
       expect.objectContaining([
         {
@@ -223,9 +325,14 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -262,9 +369,14 @@ describe('stop-rds-database-instances', () => {
 
     const instance = new StopRdsDatabaseInstancesTrick();
     const stateObject: StopRdsDatabaseInstancesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 

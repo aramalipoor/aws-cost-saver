@@ -1,5 +1,5 @@
 import URLParse from 'url-parse';
-import { StorageInterface } from '../interfaces/storage.interface';
+import { StorageInterface } from '../types/storage.interface';
 
 import { LocalStorage } from './local.storage';
 import { S3Storage } from './s3.storage';

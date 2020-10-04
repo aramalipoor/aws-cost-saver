@@ -1,6 +1,6 @@
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 
-import { StorageInterface } from '../interfaces/storage.interface';
+import { StorageInterface } from '../types/storage.interface';
 
 export class LocalStorage implements StorageInterface {
   static protocol = 'file:';

@@ -2,41 +2,58 @@ import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTaskWrapper } from 'listr2';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { AutoScalingGroupState } from '../states/auto-scaling-group.state';
+import { TrickContext } from '../types/trick-context';
+import { AutoScalingGroup } from 'aws-sdk/clients/autoscaling';
 
 export type ScaledownAutoScalingGroupsState = AutoScalingGroupState[];
 
 export class ScaledownAutoScalingGroupsTrick
   implements TrickInterface<ScaledownAutoScalingGroupsState> {
+  static machineName = 'scaledown-auto-scaling-groups';
+
   private asClient: AWS.AutoScaling;
 
-  static machineName = 'scaledown-auto-scaling-groups';
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
 
   constructor() {
     this.asClient = new AWS.AutoScaling();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
     return ScaledownAutoScalingGroupsTrick.machineName;
   }
 
+  async prepareTags(
+    context: TrickContext,
+    task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
+  ): Promise<void> {
+    task.skip(`ignored, no need to prepare tags`);
+  }
+
   async getCurrentState(
+    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
     currentState: ScaledownAutoScalingGroupsState,
     options: TrickOptionsInterface,
   ): Promise<void> {
     const scalingGroups = await this.listAutoScalingGroups(task);
+    const filteredScalingGroups = scalingGroups.filter(sg =>
+      this.isAsgIncluded(options, sg),
+    );
 
-    if (!scalingGroups || scalingGroups.length === 0) {
+    if (!filteredScalingGroups || filteredScalingGroups.length === 0) {
       task.skip(chalk.dim('no ASG found'));
       return;
     }
 
     currentState.push(
-      ...scalingGroups.map(
+      ...filteredScalingGroups.map(
         (asg): AutoScalingGroupState => {
           return {
             name: asg.AutoScalingGroupName,
@@ -182,5 +199,26 @@ export class ScaledownAutoScalingGroupsTrick
       .promise();
 
     task.output = `Restored`;
+  }
+
+  private isAsgIncluded(
+    options: TrickOptionsInterface,
+    asg: AutoScalingGroup,
+  ): boolean {
+    if (!options.tags || options.tags.length === 0) {
+      return true;
+    }
+
+    return options.tags.every(filterTag => {
+      const fr = asg.Tags?.filter(
+        asgTag =>
+          asgTag.Key === filterTag.Key &&
+          (!filterTag.Values ||
+            filterTag.Values.length === 0 ||
+            filterTag.Values.includes(asgTag.Value as string)),
+      );
+
+      return Boolean(fr?.length);
+    });
   }
 }

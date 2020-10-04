@@ -1,19 +1,21 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { TagFilterList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { RdsDatabaseState } from '../states/rds-database.state';
+import { TrickContext } from '../types/trick-context';
 
 export type StopRdsDatabaseInstancesState = RdsDatabaseState[];
 
 export class StopRdsDatabaseInstancesTrick
   implements TrickInterface<StopRdsDatabaseInstancesState> {
-  private rdsClient: AWS.RDS;
-
   static machineName = 'stop-rds-database-instances';
+
+  private rdsClient: AWS.RDS;
 
   constructor() {
     this.rdsClient = new AWS.RDS();
@@ -23,12 +25,21 @@ export class StopRdsDatabaseInstancesTrick
     return StopRdsDatabaseInstancesTrick.machineName;
   }
 
+  async prepareTags(
+    context: TrickContext,
+    task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
+  ): Promise<void> {
+    task.skip(`ignored, no need to prepare tags`);
+  }
+
   async getCurrentState(
+    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
     currentState: StopRdsDatabaseInstancesState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const databases = await this.listDatabases(task);
+    const databases = await this.listDatabases(task, options);
 
     const subListr = task.newListr([], {
       concurrent: 10,
@@ -211,6 +222,7 @@ export class StopRdsDatabaseInstancesTrick
 
   private async listDatabases(
     task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
   ): Promise<AWS.RDS.DBInstanceList> {
     const databases: AWS.RDS.DBInstanceList = [];
 
@@ -221,6 +233,9 @@ export class StopRdsDatabaseInstancesTrick
         (
           await this.rdsClient
             .describeDBInstances({
+              Filters:
+                options.tags &&
+                StopRdsDatabaseInstancesTrick.prepareFilters(options.tags),
               MaxRecords: 100,
             })
             .promise()
@@ -230,5 +245,9 @@ export class StopRdsDatabaseInstancesTrick
 
     task.output = 'done';
     return databases;
+  }
+
+  private static prepareFilters(tags: TagFilterList): AWS.RDS.FilterList {
+    return tags.map(t => ({ Name: `tag:${t.Key}`, Values: t.Values || [] }));
   }
 }

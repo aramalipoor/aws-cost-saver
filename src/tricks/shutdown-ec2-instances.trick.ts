@@ -1,19 +1,21 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { TagFilterList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { EC2InstanceState } from '../states/ec2-instance.state';
+import { TrickContext } from '../types/trick-context';
 
 export type ShutdownEC2InstancesState = EC2InstanceState[];
 
 export class ShutdownEC2InstancesTrick
   implements TrickInterface<ShutdownEC2InstancesState> {
-  private ec2Client: AWS.EC2;
-
   static machineName = 'shutdown-ec2-instances';
+
+  private ec2Client: AWS.EC2;
 
   constructor() {
     this.ec2Client = new AWS.EC2();
@@ -23,12 +25,21 @@ export class ShutdownEC2InstancesTrick
     return ShutdownEC2InstancesTrick.machineName;
   }
 
+  async prepareTags(
+    context: TrickContext,
+    task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
+  ): Promise<void> {
+    task.skip(`ignored, no need to prepare tags`);
+  }
+
   async getCurrentState(
+    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
     currentState: ShutdownEC2InstancesState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const reservations = await this.listReservations(task);
+    const reservations = await this.listReservations(task, options);
 
     const subListr = task.newListr([], {
       concurrent: 10,
@@ -151,6 +162,7 @@ export class ShutdownEC2InstancesTrick
 
   private async listReservations(
     task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
   ): Promise<AWS.EC2.ReservationList> {
     const reservations: AWS.EC2.ReservationList = [];
 
@@ -158,7 +170,14 @@ export class ShutdownEC2InstancesTrick
     task.output = 'fetching page 1...';
     reservations.push(
       ...((
-        await this.ec2Client.describeInstances({ MaxResults: 1000 }).promise()
+        await this.ec2Client
+          .describeInstances({
+            Filters:
+              options.tags &&
+              ShutdownEC2InstancesTrick.prepareFilters(options.tags),
+            MaxResults: 1000,
+          })
+          .promise()
       ).Reservations || []),
     );
 
@@ -245,5 +264,9 @@ export class ShutdownEC2InstancesTrick
       .promise();
 
     task.output = `Started`;
+  }
+
+  private static prepareFilters(tags: TagFilterList): AWS.EC2.FilterList {
+    return tags.map(t => ({ Name: `tag:${t.Key}`, Values: t.Values }));
   }
 }

@@ -2,6 +2,7 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import { createMockTask } from '../util';
 
@@ -10,6 +11,8 @@ import {
   SnapshotRemoveElasticacheRedisState,
 } from '../../src/tricks/snapshot-remove-elasticache-redis.trick';
 import { ElasticacheReplicationGroupState } from '../../src/states/elasticache-replication-group.state';
+import { TrickContext } from '../../src/types/trick-context';
+import { TrickOptionsInterface } from '../../src/types/trick-options.interface';
 
 const SampleReplicationGroupState = {
   id: 'foo',
@@ -47,6 +50,10 @@ const SampleReplicationGroupState = {
 };
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters and listTagsForResource at the moment
   AWS.ElastiCache.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
@@ -62,6 +69,26 @@ beforeAll(async done => {
 
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('snapshot-remove-elasticache-redis', () => {
@@ -96,13 +123,51 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
     AWSMock.restore('ElastiCache');
+  });
+
+  it('prepares resource tags', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [
+            { ResourceARN: 'arn:elasticache/foo' },
+            { ResourceARN: 'arn:elasticache/bar' },
+          ],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
+
+    const instance = new SnapshotRemoveElasticacheRedisTrick();
+    const trickContext: TrickContext = {};
+    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+
+    expect(trickContext).toMatchObject({
+      resourceTagMappings: [
+        { ResourceARN: 'arn:elasticache/foo' },
+        { ResourceARN: 'arn:elasticache/bar' },
+      ],
+    });
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
   });
 
   it('errors if required fields were not returned by AWS', async () => {
@@ -139,9 +204,14 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -196,9 +266,14 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -259,9 +334,16 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:elasticachecluster/foo' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -293,7 +375,7 @@ describe('snapshot-remove-elasticache-redis', () => {
             {
               ReplicationGroupId: 'foo',
               Status: 'available',
-              ARN: 'arn:elasticachecluster/foo',
+              ARN: 'arn:elasticache:replicationgroup/foo',
               MemberClusters: ['bar'],
               AtRestEncryptionEnabled: true,
               TransitEncryptionEnabled: true,
@@ -318,6 +400,7 @@ describe('snapshot-remove-elasticache-redis', () => {
         callback(null, {
           CacheClusters: [
             {
+              ARN: 'arn:elasticache:cluster/bar',
               AutoMinorVersionUpgrade: true,
               CacheNodeType: 'cache.t2.small',
               SnapshotRetentionLimit: 10,
@@ -340,9 +423,16 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -386,7 +476,7 @@ describe('snapshot-remove-elasticache-redis', () => {
     AWSMock.restore('ElastiCache');
   });
 
-  it('generates state object for ElastiCache redis clusters without PreferredAvailabilityZone', async () => {
+  it('generates state object for tagged resources', async () => {
     AWSMock.setSDKInstance(AWS);
 
     AWSMock.mock(
@@ -402,6 +492,107 @@ describe('snapshot-remove-elasticache-redis', () => {
               ReplicationGroupId: 'foo',
               Status: 'available',
               ARN: 'arn:elasticachecluster/foo',
+              MemberClusters: ['foo-member'],
+              AtRestEncryptionEnabled: true,
+              TransitEncryptionEnabled: true,
+              MultiAZ: 'enabled',
+              Description: 'something',
+              KmsKeyId: 'secret-key-id',
+              AutomaticFailover: 'enabled',
+              NodeGroups: [{ NodeGroupId: 'qux', Slots: '0-50000' }],
+            },
+            {
+              ReplicationGroupId: 'bar',
+              Status: 'available',
+              ARN: 'arn:elasticachecluster/bar',
+              MemberClusters: ['bar-member'],
+              AtRestEncryptionEnabled: true,
+              TransitEncryptionEnabled: true,
+              MultiAZ: 'enabled',
+              Description: 'something',
+              KmsKeyId: 'secret-key-id',
+              AutomaticFailover: 'enabled',
+              NodeGroups: [{ NodeGroupId: 'qux', Slots: '0-50000' }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.ReplicationGroupMessage);
+      },
+    );
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeCacheClusters',
+      (
+        params: AWS.ElastiCache.Types.DescribeCacheClustersMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          CacheClusters: [
+            {
+              ARN: `arn:elasticachecluster/${params.CacheClusterId}`,
+              AutoMinorVersionUpgrade: true,
+              CacheNodeType: 'cache.t2.small',
+              SnapshotRetentionLimit: 10,
+              Engine: 'redis',
+              EngineVersion: '5.0.6',
+              CacheParameterGroup: { CacheParameterGroupName: 'baz' },
+              CacheSubnetGroupName: 'qux',
+              CacheSecurityGroups: [{ CacheSecurityGroupName: 'quuz' }],
+              SecurityGroups: [{ SecurityGroupId: 'my-sec' }],
+              NotificationConfiguration: { TopicArn: 'arn:topic/quux' },
+              SnapshotWindow: '05:00-09:00',
+              PreferredMaintenanceWindow: 'sun:23:00-mon:01:30',
+              PreferredAvailabilityZone: 'eu-central-1c',
+              CacheNodes: [{ Endpoint: { Port: 3333 } }],
+            },
+          ],
+        } as AWS.ElastiCache.Types.CacheClusterMessage);
+      },
+    );
+
+    const instance = new SnapshotRemoveElasticacheRedisTrick();
+    const stateObject: SnapshotRemoveElasticacheRedisState = [];
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [
+          { ResourceARN: 'arn:elasticachecluster/bar-member' },
+        ],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(stateObject.length).toBe(1);
+    expect(stateObject.pop()).toStrictEqual(
+      expect.objectContaining({
+        id: 'bar',
+      } as ElasticacheReplicationGroupState),
+    );
+
+    AWSMock.restore('ElastiCache');
+  });
+
+  it('generates state object for ElastiCache redis clusters without PreferredAvailabilityZone', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ElastiCache',
+      'describeReplicationGroups',
+      (
+        params: AWS.ElastiCache.Types.DescribeReplicationGroupsMessage,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ReplicationGroups: [
+            {
+              ReplicationGroupId: 'foo',
+              Status: 'available',
+              ARN: 'arn:elasticache:replicationgroup/foo',
               MemberClusters: ['bar'],
               AtRestEncryptionEnabled: true,
               TransitEncryptionEnabled: true,
@@ -426,6 +617,7 @@ describe('snapshot-remove-elasticache-redis', () => {
         callback(null, {
           CacheClusters: [
             {
+              ARN: 'arn:elasticache:cluster/bar',
               AutoMinorVersionUpgrade: true,
               CacheNodeType: 'cache.t2.small',
               SnapshotRetentionLimit: 10,
@@ -448,9 +640,16 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -509,7 +708,7 @@ describe('snapshot-remove-elasticache-redis', () => {
             {
               ReplicationGroupId: 'foo',
               Status: 'available',
-              ARN: 'arn:elasticachecluster/foo',
+              ARN: 'arn:elasticache:replicationgroup/foo',
               MemberClusters: ['bar'],
               AtRestEncryptionEnabled: true,
               TransitEncryptionEnabled: true,
@@ -533,6 +732,7 @@ describe('snapshot-remove-elasticache-redis', () => {
         callback(null, {
           CacheClusters: [
             {
+              ARN: 'arn:elasticache:cluster/bar',
               AutoMinorVersionUpgrade: true,
               CacheNodeType: 'cache.t2.small',
               SnapshotRetentionLimit: 10,
@@ -555,9 +755,16 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -616,7 +823,7 @@ describe('snapshot-remove-elasticache-redis', () => {
             {
               ReplicationGroupId: 'foo',
               Status: 'available',
-              ARN: 'arn:elasticachecluster/foo',
+              ARN: 'arn:elasticache:replicationgroup/foo',
               MemberClusters: ['bar'],
               AtRestEncryptionEnabled: true,
               TransitEncryptionEnabled: true,
@@ -644,6 +851,7 @@ describe('snapshot-remove-elasticache-redis', () => {
         callback(null, {
           CacheClusters: [
             {
+              ARN: 'arn:elasticache:cluster/bar',
               AutoMinorVersionUpgrade: true,
               CacheNodeType: 'cache.t2.small',
               SnapshotRetentionLimit: 10,
@@ -666,9 +874,16 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -736,9 +951,9 @@ describe('snapshot-remove-elasticache-redis', () => {
         callback(null, {
           ReplicationGroups: [
             {
+              ARN: 'arn:elasticache:replicationgroup/foo',
               ReplicationGroupId: 'foo',
               Status: 'available',
-              ARN: 'arn:elasticachecluster/foo',
               MemberClusters: ['bar'],
               AtRestEncryptionEnabled: true,
               TransitEncryptionEnabled: true,
@@ -763,6 +978,7 @@ describe('snapshot-remove-elasticache-redis', () => {
         callback(null, {
           CacheClusters: [
             {
+              ARN: 'arn:elasticache:cluster/bar',
               AutoMinorVersionUpgrade: true,
               CacheNodeType: 'cache.t2.small',
               SnapshotRetentionLimit: 10,
@@ -785,9 +1001,16 @@ describe('snapshot-remove-elasticache-redis', () => {
 
     const instance = new SnapshotRemoveElasticacheRedisTrick();
     const stateObject: SnapshotRemoveElasticacheRedisState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:elasticache:cluster/bar' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 

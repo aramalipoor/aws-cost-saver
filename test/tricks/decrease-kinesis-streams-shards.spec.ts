@@ -2,6 +2,7 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import { createMockTask } from '../util';
 
@@ -9,8 +10,14 @@ import {
   DecreaseKinesisStreamsShardsTrick,
   DecreaseKinesisStreamsShardsState,
 } from '../../src/tricks/decrease-kinesis-streams-shards.trick';
+import { TrickContext } from '../../src/types/trick-context';
+import { TrickOptionsInterface } from '../../src/types/trick-options.interface';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters at the moment
   AWS.Kinesis.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
@@ -18,6 +25,16 @@ beforeAll(async done => {
 
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('decrease-kinesis-streams-shards', () => {
@@ -50,13 +67,51 @@ describe('decrease-kinesis-streams-shards', () => {
 
     const instance = new DecreaseKinesisStreamsShardsTrick();
     const stateObject: DecreaseKinesisStreamsShardsState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
     AWSMock.restore('Kinesis');
+  });
+
+  it('prepares resource tags', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [
+            { ResourceARN: 'arn:kinesis/foo' },
+            { ResourceARN: 'arn:kinesis/bar' },
+          ],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
+
+    const instance = new DecreaseKinesisStreamsShardsTrick();
+    const trickContext: TrickContext = {};
+    await instance.prepareTags(trickContext, task, {} as TrickOptionsInterface);
+
+    expect(trickContext).toMatchObject({
+      resourceTagMappings: [
+        { ResourceARN: 'arn:kinesis/foo' },
+        { ResourceARN: 'arn:kinesis/bar' },
+      ],
+    });
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
   });
 
   it('generates state object for Kinesis streams', async () => {
@@ -91,15 +146,79 @@ describe('decrease-kinesis-streams-shards', () => {
 
     const instance = new DecreaseKinesisStreamsShardsTrick();
     const stateObject: DecreaseKinesisStreamsShardsState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:kinesis/foo' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
     expect(stateObject).toMatchObject([
       {
         name: 'foo',
+        shards: 4,
+        state: 'ACTIVE',
+      },
+    ] as DecreaseKinesisStreamsShardsState);
+
+    AWSMock.restore('Kinesis');
+  });
+
+  it('generates state object for tagged resources', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'Kinesis',
+      'listStreams',
+      (params: AWS.Kinesis.Types.ListStreamsInput, callback: Function) => {
+        callback(null, {
+          HasMoreStreams: false,
+          StreamNames: ['foo', 'bar'],
+        } as AWS.Kinesis.Types.ListStreamsOutput);
+      },
+    );
+
+    AWSMock.mock(
+      'Kinesis',
+      'describeStreamSummary',
+      (
+        params: AWS.Kinesis.Types.DescribeStreamSummaryInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          StreamDescriptionSummary: {
+            OpenShardCount: 4,
+            StreamStatus: 'ACTIVE',
+          },
+        } as AWS.Kinesis.Types.DescribeStreamSummaryOutput);
+      },
+    );
+
+    const instance = new DecreaseKinesisStreamsShardsTrick();
+    const stateObject: DecreaseKinesisStreamsShardsState = [];
+    const listr = await instance.getCurrentState(
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:kinesis/bar' }],
+      } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(stateObject.length).toBe(1);
+    expect(stateObject).toMatchObject([
+      {
+        name: 'bar',
         shards: 4,
         state: 'ACTIVE',
       },

@@ -2,15 +2,21 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import {
   RemoveNatGatewaysTrick,
   RemoveNatGatewaysState,
 } from '../../src/tricks/remove-nat-gateways.trick';
+import { TrickContext } from '../../src/types/trick-context';
 import { NatGatewayState } from '../../src/states/nat-gateway.state';
 import { createMockTask } from '../util';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters at the moment
   AWS.EC2.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
@@ -18,6 +24,16 @@ beforeAll(async done => {
 
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('remove-nat-gateways', () => {
@@ -30,6 +46,14 @@ describe('remove-nat-gateways', () => {
   it('returns correct machine name', async () => {
     const instance = new RemoveNatGatewaysTrick();
     expect(instance.getMachineName()).toBe(RemoveNatGatewaysTrick.machineName);
+  });
+
+  it('skips preparing tags', async () => {
+    const instance = new RemoveNatGatewaysTrick();
+    await instance.prepareTags({} as TrickContext, task, {
+      dryRun: false,
+    });
+    expect(task.skip).toBeCalled();
   });
 
   it('returns an empty Listr if no NAT gateway is found', async () => {
@@ -50,9 +74,14 @@ describe('remove-nat-gateways', () => {
 
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -118,9 +147,14 @@ describe('remove-nat-gateways', () => {
 
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -228,9 +262,14 @@ describe('remove-nat-gateways', () => {
 
     const instance = new RemoveNatGatewaysTrick();
     const stateObject: RemoveNatGatewaysState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -256,6 +295,115 @@ describe('remove-nat-gateways', () => {
         { routeTableId: 'lopr', destinationPrefixListId: 'some-id' },
       ],
       tags: [{ Key: 'Team', Value: 'Tacos' }],
+    } as NatGatewayState);
+
+    AWSMock.restore('EC2');
+  });
+
+  it('generates state object for tagged resources', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const describeNatGatewaysSpy = jest
+      .fn()
+      .mockImplementationOnce(
+        (
+          params: AWS.EC2.Types.DescribeNatGatewaysRequest,
+          callback: Function,
+        ) => {
+          callback(null, {
+            NatGateways: [
+              {
+                NatGatewayId: 'foosec',
+                VpcId: 'barex',
+                SubnetId: 'baza',
+                NatGatewayAddresses: [{ AllocationId: 'quxoo' }],
+                State: 'available',
+                Tags: [{ Key: 'Team', Value: 'Chimichanga' }],
+              },
+            ],
+          } as AWS.EC2.Types.DescribeNatGatewaysResult);
+        },
+      );
+    AWSMock.mock('EC2', 'describeNatGateways', describeNatGatewaysSpy);
+
+    AWSMock.mock(
+      'EC2',
+      'describeRouteTables',
+      (
+        params: AWS.EC2.Types.DescribeRouteTablesRequest,
+        callback: Function,
+      ) => {
+        callback(null, {
+          RouteTables: [
+            {
+              RouteTableId: 'quuz',
+              Routes: [
+                { DestinationCidrBlock: '1.1.0.0/0', NatGatewayId: 'foosec' },
+              ],
+            },
+            {
+              RouteTableId: 'quux',
+              Routes: [
+                { DestinationCidrBlock: '2.2.0.0/0', NatGatewayId: 'foo' },
+              ],
+            },
+            {
+              RouteTableId: 'cypo',
+              Routes: [
+                {
+                  DestinationIpv6CidrBlock: '2001:db8::/32',
+                  NatGatewayId: 'foo',
+                },
+              ],
+            },
+            {
+              RouteTableId: 'lopr',
+              Routes: [
+                {
+                  DestinationPrefixListId: 'some-id',
+                  NatGatewayId: 'foo',
+                },
+              ],
+            },
+            {
+              RouteTableId: 'mayba',
+              Routes: [],
+            },
+          ],
+        } as AWS.EC2.Types.DescribeRouteTablesResult);
+      },
+    );
+
+    const instance = new RemoveNatGatewaysTrick();
+    const stateObject: RemoveNatGatewaysState = [];
+    const listr = await instance.getCurrentState(
+      { resourceTagMappings: [] } as TrickContext,
+      task,
+      stateObject,
+      {
+        dryRun: false,
+        tags: [{ Key: 'Team', Values: ['Chimichanga'] }],
+      },
+    );
+
+    await listr.run({});
+
+    expect(describeNatGatewaysSpy).toBeCalledWith(
+      expect.objectContaining({
+        Filter: [{ Name: 'tag:Team', Values: ['Chimichanga'] }],
+        MaxResults: 10,
+      } as AWS.EC2.Types.DescribeNatGatewaysRequest),
+      expect.any(Function),
+    );
+    expect(stateObject.length).toBe(1);
+    expect(stateObject.pop()).toMatchObject({
+      id: 'foosec',
+      vpcId: 'barex',
+      subnetId: 'baza',
+      allocationIds: ['quxoo'],
+      state: 'available',
+      routes: [{ routeTableId: 'quuz', destinationCidr: '1.1.0.0/0' }],
+      tags: [{ Key: 'Team', Value: 'Chimichanga' }],
     } as NatGatewayState);
 
     AWSMock.restore('EC2');

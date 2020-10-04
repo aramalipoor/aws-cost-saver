@@ -1,13 +1,28 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
+import nock from 'nock';
+
 import { S3Storage } from '../../src/storage/s3.storage';
 
 beforeAll(async done => {
+  nock.disableNetConnect();
   done();
 });
 
 beforeEach(async () => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
   jest.clearAllMocks();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('s3.storage', () => {

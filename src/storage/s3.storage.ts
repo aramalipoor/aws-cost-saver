@@ -3,7 +3,7 @@ import chalk from 'chalk';
 import figures from 'figures';
 import URLParse from 'url-parse';
 
-import { StorageInterface } from '../interfaces/storage.interface';
+import { StorageInterface } from '../types/storage.interface';
 
 export class S3Storage implements StorageInterface {
   static protocol = 's3:';

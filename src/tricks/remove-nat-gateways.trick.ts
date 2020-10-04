@@ -1,22 +1,24 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { TagFilterList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import {
   NatGatewayRouteState,
   NatGatewayState,
 } from '../states/nat-gateway.state';
+import { TrickContext } from '../types/trick-context';
 
 export type RemoveNatGatewaysState = NatGatewayState[];
 
 export class RemoveNatGatewaysTrick
   implements TrickInterface<RemoveNatGatewaysState> {
-  private ec2Client: AWS.EC2;
-
   static machineName = 'remove-nat-gateways';
+
+  private ec2Client: AWS.EC2;
 
   private routeTablesCache?: AWS.EC2.RouteTableList;
 
@@ -28,12 +30,21 @@ export class RemoveNatGatewaysTrick
     return RemoveNatGatewaysTrick.machineName;
   }
 
+  async prepareTags(
+    context: TrickContext,
+    task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
+  ): Promise<void> {
+    task.skip(`ignored, no need to prepare tags`);
+  }
+
   async getCurrentState(
+    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
     currentState: RemoveNatGatewaysState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const natGateways = await this.listNatGateways(task);
+    const natGateways = await this.listNatGateways(task, options);
 
     const subListr = task.newListr([], {
       concurrent: 10,
@@ -250,6 +261,7 @@ export class RemoveNatGatewaysTrick
 
   private async listNatGateways(
     task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
   ): Promise<AWS.EC2.NatGatewayList> {
     const natGateways: AWS.EC2.NatGatewayList = [];
 
@@ -257,7 +269,14 @@ export class RemoveNatGatewaysTrick
     task.output = 'fetching page 1...';
     natGateways.push(
       ...((
-        await this.ec2Client.describeNatGateways({ MaxResults: 10 }).promise()
+        await this.ec2Client
+          .describeNatGateways({
+            Filter:
+              options.tags &&
+              RemoveNatGatewaysTrick.prepareFilters(options.tags),
+            MaxResults: 10,
+          })
+          .promise()
       ).NatGateways as AWS.EC2.NatGatewayList),
     );
 
@@ -303,5 +322,9 @@ export class RemoveNatGatewaysTrick
     }
 
     return this.routeTablesCache;
+  }
+
+  private static prepareFilters(tags: TagFilterList): AWS.EC2.FilterList {
+    return tags.map(t => ({ Name: `tag:${t.Key}`, Values: t.Values }));
   }
 }

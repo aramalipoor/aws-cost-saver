@@ -9,9 +9,9 @@ import {
 import figures from 'figures';
 
 import BaseCommand from '../base-command';
-import { configureAWS } from '../configure-aws';
+import { transformTagsFlagToFilterList, configureAWS } from '../util';
 import { TrickRegistry } from '../tricks/trick.registry';
-import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickInterface } from '../types/trick.interface';
 
 import { ShutdownEC2InstancesTrick } from '../tricks/shutdown-ec2-instances.trick';
 import { StopFargateEcsServicesTrick } from '../tricks/stop-fargate-ecs-services.trick';
@@ -24,8 +24,8 @@ import { StopRdsDatabaseClustersTrick } from '../tricks/stop-rds-database-cluste
 import { ScaledownAutoScalingGroupsTrick } from '../tricks/scaledown-auto-scaling-groups.trick';
 import { SuspendAutoScalingGroupsTrick } from '../tricks/suspend-auto-scaling-groups.trick';
 
-import { RootState } from '../interfaces/root-state';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { RootState } from '../types/root-state';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 export default class Conserve extends BaseCommand {
   static tricksEnabledByDefault: readonly string[] = [
@@ -135,6 +135,13 @@ export default class Conserve extends BaseCommand {
       description:
         'Do not render live progress. Only print final summary in a clean format.',
     }),
+    tag: flags.string({
+      char: 't',
+      multiple: true,
+      required: false,
+      description:
+        'Resource tags to narrow down affected resources. Multiple provided tags will be AND-ed.',
+    }),
   };
 
   static args = [];
@@ -153,6 +160,7 @@ export default class Conserve extends BaseCommand {
     const rootTaskList: ListrTask[] = [];
     const options: TrickOptionsInterface = {
       dryRun: flags['dry-run'],
+      tags: flags.tag && transformTagsFlagToFilterList(flags.tag),
     };
 
     for (const trick of tricks) {
@@ -175,7 +183,7 @@ export default class Conserve extends BaseCommand {
       },
     } as ListrDefaultRendererOptions<any>);
 
-    await listr.run(rootState);
+    await listr.run();
     this.renderSummary(listr.tasks);
 
     if (!flags['no-state-file']) {
@@ -203,7 +211,7 @@ export default class Conserve extends BaseCommand {
             listr.tasks.length
           } tricks failed.`,
         );
-        throw new Error('ConserveFailure');
+        throw new Error(`ConserveFailure`);
       }
     } else if (flags['dry-run']) {
       this.log(
@@ -227,9 +235,14 @@ export default class Conserve extends BaseCommand {
     return task.newListr(
       [
         {
+          title: 'prepare tags',
+          task: (ctx, task) => trick.prepareTags(ctx, task, options),
+        },
+        {
           title: 'fetch current state',
           task: (ctx, task) =>
             trick.getCurrentState(
+              ctx,
               task,
               rootState[trick.getMachineName()],
               options,
