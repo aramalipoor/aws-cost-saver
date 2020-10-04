@@ -1,7 +1,7 @@
 {
   "name": "aws-cost-saver",
   "description": "A tiny CLI tool to help save costs in development environments when you're asleep and don't need them!",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "aramalipoor",
   "bin": {
     "aws-cost-saver": "./bin/run"
