@@ -12,10 +12,6 @@ import { TrickContext } from '../../src/types/trick-context';
 import { RdsClusterState } from '../../src/states/rds-cluster.state';
 
 import { createMockTask } from '../util';
-import {
-  ShutdownEC2InstancesState,
-  ShutdownEC2InstancesTrick,
-} from '../../src/tricks/shutdown-ec2-instances.trick';
 
 beforeAll(async done => {
   nock.abortPendingRequests();
