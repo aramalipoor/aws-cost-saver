@@ -1,12 +1,13 @@
 import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { Config } from '@oclif/config';
+import nock from 'nock';
 import { mockProcessStdout } from 'jest-mock-process';
 
 jest.mock('fs');
 import fs from 'fs';
-jest.mock('../../src/configure-aws');
-import { configureAWS } from '../../src/configure-aws';
+jest.mock('../../src/util');
+import { configureAWS } from '../../src/util';
 
 import Restore from '../../src/commands/restore';
 
@@ -17,6 +18,10 @@ async function runRestore(argv: string[]) {
 }
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters at the moment
   AWS.RDS.prototype.waitFor = jest.fn();
 
@@ -32,6 +37,16 @@ beforeEach(async () => {
       credentials: {},
     } as AWS.Config);
   });
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('conserve', () => {

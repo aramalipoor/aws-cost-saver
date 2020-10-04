@@ -1,4 +1,4 @@
-import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickInterface } from '../types/trick.interface';
 
 import { StopFargateEcsServicesTrick } from './stop-fargate-ecs-services.trick';
 import { StopRdsDatabaseInstancesTrick } from './stop-rds-database-instances.trick';

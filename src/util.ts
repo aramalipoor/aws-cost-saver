@@ -1,4 +1,8 @@
 import AWS from 'aws-sdk';
+import {
+  TagFilterList,
+  TagFilter,
+} from 'aws-sdk/clients/resourcegroupstaggingapi';
 
 export const configureAWS = async (
   profile: string,
@@ -19,3 +23,8 @@ export const configureAWS = async (
 
   return AWS.config;
 };
+
+export const transformTagsFlagToFilterList = (tags: string[]): TagFilterList =>
+  tags
+    .map(t => t.split('=', 2))
+    .map(([key, val]): TagFilter => ({ Key: key, Values: val ? [val] : [] }));

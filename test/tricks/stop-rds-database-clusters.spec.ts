@@ -2,16 +2,23 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import {
   StopRdsDatabaseClustersTrick,
   StopRdsDatabaseClustersState,
 } from '../../src/tricks/stop-rds-database-clusters.trick';
+import { TrickContext } from '../../src/types/trick-context';
 import { RdsClusterState } from '../../src/states/rds-cluster.state';
+import { TrickOptionsInterface } from '../../src/types/trick-options.interface';
 
 import { createMockTask } from '../util';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters at the moment
   AWS.RDS.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
@@ -19,6 +26,16 @@ beforeAll(async done => {
 
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('stop-rds-database-clusters', () => {
@@ -33,6 +50,39 @@ describe('stop-rds-database-clusters', () => {
     expect(instance.getMachineName()).toBe(
       StopRdsDatabaseClustersTrick.machineName,
     );
+  });
+
+  it('prepares resource tags', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [
+            { ResourceARN: 'arn:rds:cluster/foo' },
+            { ResourceARN: 'arn:rds:cluster/bar' },
+          ],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
+
+    const instance = new StopRdsDatabaseClustersTrick();
+    const trickContext: TrickContext = {};
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
+
+    expect(trickContext).toMatchObject({
+      resourceTagMappings: [
+        { ResourceARN: 'arn:rds:cluster/foo' },
+        { ResourceARN: 'arn:rds:cluster/bar' },
+      ],
+    });
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
   });
 
   it('returns an empty Listr if no databases found', async () => {
@@ -50,9 +100,14 @@ describe('stop-rds-database-clusters', () => {
 
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -72,9 +127,14 @@ describe('stop-rds-database-clusters', () => {
 
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -96,9 +156,14 @@ describe('stop-rds-database-clusters', () => {
 
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -130,9 +195,14 @@ describe('stop-rds-database-clusters', () => {
 
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -157,16 +227,29 @@ describe('stop-rds-database-clusters', () => {
       'describeDBClusters',
       (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBClusters: [{ DBClusterIdentifier: 'foo', Status: 'available' }],
+          DBClusters: [
+            {
+              DBClusterArn: 'arn:rds:cluster/foo',
+              DBClusterIdentifier: 'foo',
+              Status: 'available',
+            },
+          ],
         } as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/foo' }],
+      } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -174,6 +257,59 @@ describe('stop-rds-database-clusters', () => {
       expect.objectContaining([
         {
           identifier: 'foo',
+          status: 'available',
+        } as RdsClusterState,
+      ]),
+    );
+
+    AWSMock.restore('RDS');
+  });
+
+  it('generates state object for tagged resources', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'RDS',
+      'describeDBClusters',
+      (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
+        callback(null, {
+          DBClusters: [
+            {
+              DBClusterArn: 'arn:rds:cluster/foo',
+              DBClusterIdentifier: 'foo',
+              Status: 'available',
+            },
+            {
+              DBClusterArn: 'arn:rds:cluster/bar',
+              DBClusterIdentifier: 'bar',
+              Status: 'available',
+            },
+          ],
+        } as AWS.RDS.Types.DBClusterMessage);
+      },
+    );
+
+    const instance = new StopRdsDatabaseClustersTrick();
+    const stateObject: StopRdsDatabaseClustersState = [];
+    const listr = await instance.getCurrentState(
+      task,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/bar' }],
+      } as TrickContext,
+      stateObject,
+      {
+        tags: [{ Key: 'Team', Values: ['Tacos'] }],
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(stateObject.length).toBe(1);
+    expect(stateObject).toStrictEqual(
+      expect.objectContaining([
+        {
+          identifier: 'bar',
           status: 'available',
         } as RdsClusterState,
       ]),
@@ -190,16 +326,29 @@ describe('stop-rds-database-clusters', () => {
       'describeDBClusters',
       (params: AWS.RDS.Types.DescribeDBClustersMessage, callback: Function) => {
         callback(null, {
-          DBClusters: [{ DBClusterIdentifier: 'foo', Status: 'stopped' }],
+          DBClusters: [
+            {
+              DBClusterArn: 'arn:rds:cluster/foo',
+              DBClusterIdentifier: 'foo',
+              Status: 'stopped',
+            },
+          ],
         } as AWS.RDS.Types.DBClusterMessage);
       },
     );
 
     const instance = new StopRdsDatabaseClustersTrick();
     const stateObject: StopRdsDatabaseClustersState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:rds:cluster/foo' }],
+      } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 

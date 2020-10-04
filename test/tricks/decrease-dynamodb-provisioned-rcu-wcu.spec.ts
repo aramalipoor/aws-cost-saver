@@ -2,17 +2,34 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import {
   DecreaseDynamoDBProvisionedRcuWcuTrick,
   DecreaseDynamoDBProvisionedRcuWcuState,
 } from '../../src/tricks/decrease-dynamodb-provisioned-rcu-wcu.trick';
+import { TrickContext } from '../../src/types/trick-context';
 import { DynamoDBTableState } from '../../src/states/dynamodb-table.state';
 import { createMockTask } from '../util';
+import { TrickOptionsInterface } from '../../src/types/trick-options.interface';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
@@ -42,9 +59,14 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
 
     const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
     const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -64,13 +86,51 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
 
     const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
     const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
     AWSMock.restore('DynamoDB');
+  });
+
+  it('prepares resource tags', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [
+            { ResourceARN: 'arn:dynamodb/foo' },
+            { ResourceARN: 'arn:dynamodb/bar' },
+          ],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
+
+    const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
+    const trickContext: TrickContext = {};
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
+
+    expect(trickContext).toMatchObject({
+      resourceTagMappings: [
+        { ResourceARN: 'arn:dynamodb/foo' },
+        { ResourceARN: 'arn:dynamodb/bar' },
+      ],
+    });
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
   });
 
   it('generates state object for provisioned RCU and WCU', async () => {
@@ -106,14 +166,77 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
 
     const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
     const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:dynamodb/foo' }],
+      } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
     expect(stateObject.pop()).toMatchObject({
       name: 'foo',
+      provisionedThroughput: true,
+      wcu: 15,
+      rcu: 17,
+    } as DynamoDBTableState);
+
+    AWSMock.restore('DynamoDB');
+  });
+
+  it('generates state object for specific tagged resource', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'listTables',
+      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
+        callback(null, { TableNames: ['foo', 'bar'] });
+      },
+    );
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'bar') {
+          callback(null, {
+            Table: {
+              TableName: 'bar',
+              ProvisionedThroughput: {
+                WriteCapacityUnits: 15,
+                ReadCapacityUnits: 17,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
+    const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
+    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
+    const listr = await instance.getCurrentState(
+      task,
+      {
+        resourceTagMappings: [{ ResourceARN: 'arn:dynamodb/bar' }],
+      } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(stateObject.pop()).toMatchObject({
+      name: 'bar',
       provisionedThroughput: true,
       wcu: 15,
       rcu: 17,
@@ -151,9 +274,65 @@ describe('decrease-dynamodb-provisioned-rcu-wcu', () => {
 
     const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
     const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [{ ResourceARN: 'arn:xxx/foo' }] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(stateObject.pop()).toMatchObject({
+      name: 'foo',
+      provisionedThroughput: false,
+    } as DynamoDBTableState);
+
+    AWSMock.restore('DynamoDB');
+  });
+
+  it('generates state object when table does not have provisioned RCU but has WCU', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'DynamoDB',
+      'listTables',
+      (params: AWS.DynamoDB.Types.ListTablesInput, callback: Function) => {
+        callback(null, { TableNames: ['foo'] });
+      },
+    );
+
+    AWSMock.mock(
+      'DynamoDB',
+      'describeTable',
+      (params: AWS.DynamoDB.Types.DescribeTableInput, callback: Function) => {
+        if (params.TableName === 'foo') {
+          callback(null, {
+            Table: {
+              TableName: 'foo',
+              ProvisionedThroughput: {
+                ReadCapacityUnits: 10,
+              },
+            },
+          } as AWS.DynamoDB.Types.DescribeTableOutput);
+        } else {
+          callback(new Error('Table not exists'));
+        }
+      },
+    );
+
+    const instance = new DecreaseDynamoDBProvisionedRcuWcuTrick();
+    const stateObject: DecreaseDynamoDBProvisionedRcuWcuState = [];
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [{ ResourceARN: 'arn:xxx/foo' }] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 

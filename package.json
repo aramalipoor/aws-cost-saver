@@ -19,6 +19,7 @@
     "inquirer": "^7.3.3",
     "listr2": "2.6.2",
     "lodash": "^4.17.19",
+    "nock": "^13.0.4",
     "tslib": "^1.13.0",
     "url-parse": "^1.4.7"
   },
@@ -65,7 +66,7 @@
   "license": "MIT",
   "main": "dist/index.js",
   "oclif": {
-    "commands": "./dist/commands",
+    "commands": "./dist/src/commands",
     "bin": "aws-cost-saver",
     "plugins": [
       "@oclif/plugin-help"

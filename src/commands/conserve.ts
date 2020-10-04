@@ -9,9 +9,9 @@ import {
 import figures from 'figures';
 
 import BaseCommand from '../base-command';
-import { configureAWS } from '../configure-aws';
+import { transformTagsFlagToFilterList, configureAWS } from '../util';
 import { TrickRegistry } from '../tricks/trick.registry';
-import { TrickInterface } from '../interfaces/trick.interface';
+import { TrickInterface } from '../types/trick.interface';
 
 import { ShutdownEC2InstancesTrick } from '../tricks/shutdown-ec2-instances.trick';
 import { StopFargateEcsServicesTrick } from '../tricks/stop-fargate-ecs-services.trick';
@@ -24,8 +24,10 @@ import { StopRdsDatabaseClustersTrick } from '../tricks/stop-rds-database-cluste
 import { ScaledownAutoScalingGroupsTrick } from '../tricks/scaledown-auto-scaling-groups.trick';
 import { SuspendAutoScalingGroupsTrick } from '../tricks/suspend-auto-scaling-groups.trick';
 
-import { RootState } from '../interfaces/root-state';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { RootState } from '../types/root-state';
+import { RootContext } from '../types/root-context';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
+import { TrickContext } from '../types/trick-context';
 
 export default class Conserve extends BaseCommand {
   static tricksEnabledByDefault: readonly string[] = [
@@ -63,6 +65,7 @@ export default class Conserve extends BaseCommand {
     `$ aws-cost-saver conserve ${chalk.yellow('--dry-run')}`,
     `$ aws-cost-saver conserve ${chalk.yellow('--no-state-file')}`,
     `$ aws-cost-saver conserve ${chalk.yellow('--only-summary')}`,
+    `$ aws-cost-saver conserve ${chalk.yellow('-d -n -m -t Team=Tacos')}`,
     `$ aws-cost-saver conserve ${chalk.yellow(
       `--use-trick ${chalk.bold(
         SnapshotRemoveElasticacheRedisTrick.machineName,
@@ -135,6 +138,13 @@ export default class Conserve extends BaseCommand {
       description:
         'Do not render live progress. Only print final summary in a clean format.',
     }),
+    tag: flags.string({
+      char: 't',
+      multiple: true,
+      required: false,
+      description:
+        'Resource tags to narrow down affected resources. Multiple provided tags will be AND-ed.',
+    }),
   };
 
   static args = [];
@@ -149,17 +159,29 @@ export default class Conserve extends BaseCommand {
     this.printBanner(awsConfig, flags);
 
     const tricks = this.getEnabledTricks(flags);
+    const rootContext: RootContext = {};
     const rootState: RootState = {};
     const rootTaskList: ListrTask[] = [];
     const options: TrickOptionsInterface = {
       dryRun: flags['dry-run'],
+      tags: flags.tag && transformTagsFlagToFilterList(flags.tag),
     };
 
     for (const trick of tricks) {
       rootTaskList.push({
         title: `${chalk.dim(`conserve:`)} ${trick.getMachineName()}`,
-        task: (ctx, task) =>
-          this.createTrickListr(task, rootState, trick, options),
+        task: (ctx, task) => {
+          rootContext[trick.getMachineName()] = {};
+          rootState[trick.getMachineName()] = [];
+
+          return this.createTrickListr({
+            trickTask: task,
+            trickContext: rootContext[trick.getMachineName()],
+            trickState: rootState[trick.getMachineName()],
+            trickInstance: trick,
+            trickOptions: options,
+          });
+        },
       });
     }
 
@@ -175,7 +197,7 @@ export default class Conserve extends BaseCommand {
       },
     } as ListrDefaultRendererOptions<any>);
 
-    await listr.run(rootState);
+    await listr.run(rootContext);
     this.renderSummary(listr.tasks);
 
     if (!flags['no-state-file']) {
@@ -203,7 +225,7 @@ export default class Conserve extends BaseCommand {
             listr.tasks.length
           } tricks failed.`,
         );
-        throw new Error('ConserveFailure');
+        throw new Error(`ConserveFailure`);
       }
     } else if (flags['dry-run']) {
       this.log(
@@ -216,29 +238,38 @@ export default class Conserve extends BaseCommand {
     }
   }
 
-  private createTrickListr(
-    task: ListrTaskWrapper<any, any>,
-    rootState: RootState,
-    trick: TrickInterface<any>,
-    options: TrickOptionsInterface,
-  ): Listr<any, any, any> {
-    rootState[trick.getMachineName()] = [];
-
-    return task.newListr(
+  private createTrickListr(cfg: {
+    trickTask: ListrTaskWrapper<any, any>;
+    trickContext: TrickContext;
+    trickState: Record<string, any>[];
+    trickInstance: TrickInterface<any>;
+    trickOptions: TrickOptionsInterface;
+  }): Listr<any, any, any> {
+    return cfg.trickTask.newListr(
       [
+        {
+          title: 'prepare tags',
+          task: (ctx, task) =>
+            cfg.trickInstance.prepareTags(
+              task,
+              cfg.trickContext,
+              cfg.trickOptions,
+            ),
+        },
         {
           title: 'fetch current state',
           task: (ctx, task) =>
-            trick.getCurrentState(
+            cfg.trickInstance.getCurrentState(
               task,
-              rootState[trick.getMachineName()],
-              options,
+              cfg.trickContext,
+              cfg.trickState,
+              cfg.trickOptions,
             ),
         },
         {
           title: 'conserve resources',
           task: (ctx, task) =>
-            trick.conserve(task, rootState[trick.getMachineName()], options),
+            cfg.trickInstance.conserve(task, cfg.trickState, cfg.trickOptions),
         },
       ],
       {

@@ -1,34 +1,66 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { RdsDatabaseState } from '../states/rds-database.state';
+import { TrickContext } from '../types/trick-context';
 
 export type StopRdsDatabaseInstancesState = RdsDatabaseState[];
 
 export class StopRdsDatabaseInstancesTrick
   implements TrickInterface<StopRdsDatabaseInstancesState> {
+  static machineName = 'stop-rds-database-instances';
+
   private rdsClient: AWS.RDS;
 
-  static machineName = 'stop-rds-database-instances';
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
 
   constructor() {
     this.rdsClient = new AWS.RDS();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
     return StopRdsDatabaseInstancesTrick.machineName;
   }
 
+  async prepareTags(
+    task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
+    options: TrickOptionsInterface,
+  ): Promise<Listr | void> {
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['rds:db'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
+  }
+
   async getCurrentState(
     task: ListrTaskWrapper<any, any>,
-    currentState: StopRdsDatabaseInstancesState,
+    context: TrickContext,
+    state: StopRdsDatabaseInstancesState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const databases = await this.listDatabases(task);
+    const databases = await this.listDatabases(task, options);
 
     const subListr = task.newListr([], {
       concurrent: 10,
@@ -49,7 +81,7 @@ export class StopRdsDatabaseInstancesTrick
           return {
             title:
               database.DBInstanceIdentifier || chalk.italic('<no-identifier>'),
-            task: async () => {
+            task: async (ctx, task) => {
               if (database.DBInstanceIdentifier === undefined) {
                 throw new Error(
                   `Unexpected error: DBInstanceIdentifier is missing for RDS database`,
@@ -62,7 +94,14 @@ export class StopRdsDatabaseInstancesTrick
                 );
               }
 
-              currentState.push({
+              if (
+                !this.isArnIncluded(context, database.DBInstanceArn as string)
+              ) {
+                task.skip(`ignored, due to tag filters`);
+                return;
+              }
+
+              state.push({
                 identifier: database.DBInstanceIdentifier,
                 status: database.DBInstanceStatus,
               });
@@ -211,6 +250,7 @@ export class StopRdsDatabaseInstancesTrick
 
   private async listDatabases(
     task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
   ): Promise<AWS.RDS.DBInstanceList> {
     const databases: AWS.RDS.DBInstanceList = [];
 
@@ -230,5 +270,13 @@ export class StopRdsDatabaseInstancesTrick
 
     task.output = 'done';
     return databases;
+  }
+
+  private isArnIncluded(context: TrickContext, arn: string): boolean {
+    return Boolean(
+      context.resourceTagMappings?.find(
+        rm => (rm.ResourceARN as string) === arn,
+      ),
+    );
   }
 }

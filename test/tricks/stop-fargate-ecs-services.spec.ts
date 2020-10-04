@@ -2,14 +2,21 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import {
   StopFargateEcsServicesTrick,
   StopFargateEcsServicesState,
 } from '../../src/tricks/stop-fargate-ecs-services.trick';
+import { TrickContext } from '../../src/types/trick-context';
 import { createMockTask } from '../util';
+import { TrickOptionsInterface } from '../../src/types/trick-options.interface';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   // AWSMock cannot mock waiters at the moment
   AWS.ECS.prototype.waitFor = jest.fn().mockImplementation(() => ({
     promise: jest.fn(),
@@ -17,6 +24,16 @@ beforeAll(async done => {
 
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('stop-fargate-ecs-services', () => {
@@ -31,6 +48,39 @@ describe('stop-fargate-ecs-services', () => {
     expect(instance.getMachineName()).toBe(
       StopFargateEcsServicesTrick.machineName,
     );
+  });
+
+  it('prepares resource tags', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ResourceGroupsTaggingAPI',
+      'getResources',
+      (
+        params: AWS.ResourceGroupsTaggingAPI.GetResourcesInput,
+        callback: Function,
+      ) => {
+        callback(null, {
+          ResourceTagMappingList: [
+            { ResourceARN: 'arn:cluster/foo' },
+            { ResourceARN: 'arn:service/bar' },
+          ],
+        } as AWS.ResourceGroupsTaggingAPI.GetResourcesOutput);
+      },
+    );
+
+    const instance = new StopFargateEcsServicesTrick();
+    const trickContext: TrickContext = {};
+    await instance.prepareTags(task, trickContext, {} as TrickOptionsInterface);
+
+    expect(trickContext).toMatchObject({
+      resourceTagMappings: [
+        { ResourceARN: 'arn:cluster/foo' },
+        { ResourceARN: 'arn:service/bar' },
+      ],
+    });
+
+    AWSMock.restore('ResourceGroupsTaggingAPI');
   });
 
   it('returns an empty Listr if no clusters found', async () => {
@@ -48,9 +98,14 @@ describe('stop-fargate-ecs-services', () => {
 
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(listr.tasks.length).toBe(0);
 
@@ -90,9 +145,14 @@ describe('stop-fargate-ecs-services', () => {
 
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
-    const stateListr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const stateListr = await instance.getCurrentState(
+      task,
+      {} as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await stateListr.run();
 
@@ -146,9 +206,14 @@ describe('stop-fargate-ecs-services', () => {
 
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run();
 
@@ -173,7 +238,11 @@ describe('stop-fargate-ecs-services', () => {
       'listClusters',
       (params: AWS.ECS.Types.ListClustersRequest, callback: Function) => {
         callback(null, {
-          clusterArns: ['arn:cluster/foo', 'arn:cluster/bar'],
+          clusterArns: [
+            'arn:cluster/foo',
+            'arn:cluster/bar',
+            'arn:cluster/bax',
+          ],
         } as AWS.ECS.Types.ListClustersResponse);
       },
     );
@@ -189,6 +258,10 @@ describe('stop-fargate-ecs-services', () => {
         } else if (params.cluster === 'arn:cluster/bar') {
           callback(null, {
             serviceArns: ['arn:service/quux', 'arn:service/quuz'],
+          } as AWS.ECS.Types.ListServicesResponse);
+        } else if (params.cluster === 'arn:cluster/bax') {
+          callback(null, {
+            serviceArns: [],
           } as AWS.ECS.Types.ListServicesResponse);
         } else {
           throw new Error(`Wrong cluster arn`);
@@ -288,9 +361,20 @@ describe('stop-fargate-ecs-services', () => {
 
     const instance = new StopFargateEcsServicesTrick();
     const stateObject: StopFargateEcsServicesState = [];
-    const listr = await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    const listr = await instance.getCurrentState(
+      task,
+      {
+        resourceTagMappings: [
+          { ResourceARN: 'arn:service/baz' },
+          { ResourceARN: 'arn:service/qux' },
+          { ResourceARN: 'arn:cluster/bar' },
+        ],
+      } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     await listr.run({});
 
@@ -315,6 +399,168 @@ describe('stop-fargate-ecs-services', () => {
             arn: 'arn:service/qux',
             desired: 1,
             scalableTargets: [],
+          },
+        ],
+      },
+      {
+        arn: 'arn:cluster/bar',
+        services: [
+          {
+            arn: 'arn:service/quux',
+            desired: 0,
+            scalableTargets: [],
+          },
+          {
+            arn: 'arn:service/quuz',
+            desired: 10,
+            scalableTargets: [
+              {
+                min: 0,
+                max: 20,
+                scalableDimension: 'ecs:service:DesiredCount',
+                resourceId: 'service/bar/quuz',
+                namespace: 'ecs',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        arn: 'arn:cluster/bax',
+        services: [],
+      },
+    ] as StopFargateEcsServicesState);
+
+    AWSMock.restore('ECS');
+  });
+
+  it('generates state object for tagged resources', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'ECS',
+      'listClusters',
+      (params: AWS.ECS.Types.ListClustersRequest, callback: Function) => {
+        callback(null, {
+          clusterArns: ['arn:cluster/foo', 'arn:cluster/bar'],
+        } as AWS.ECS.Types.ListClustersResponse);
+      },
+    );
+
+    AWSMock.mock(
+      'ECS',
+      'listServices',
+      (params: AWS.ECS.Types.ListServicesRequest, callback: Function) => {
+        if (params.cluster === 'arn:cluster/foo') {
+          callback(null, {
+            serviceArns: ['arn:service/baz', 'arn:service/qux'],
+          } as AWS.ECS.Types.ListServicesResponse);
+        } else if (params.cluster === 'arn:cluster/bar') {
+          callback(null, {
+            serviceArns: ['arn:service/quux', 'arn:service/quuz'],
+          } as AWS.ECS.Types.ListServicesResponse);
+        } else {
+          throw new Error(`Wrong cluster arn`);
+        }
+      },
+    );
+
+    AWSMock.mock(
+      'ECS',
+      'describeServices',
+      (params: AWS.ECS.Types.DescribeServicesRequest, callback: Function) => {
+        const response: AWS.ECS.Types.DescribeServicesResponse = {
+          services: [],
+        };
+        const services = [];
+
+        if (params.services.includes('arn:service/baz')) {
+          services.push({
+            serviceArn: 'arn:service/baz',
+            desiredCount: 3,
+          });
+        }
+        if (params.services.includes('arn:service/qux')) {
+          services.push({
+            serviceArn: 'arn:service/qux',
+            desiredCount: 1,
+          });
+        }
+        if (params.services.includes('arn:service/quux')) {
+          services.push({
+            serviceArn: 'arn:service/quux',
+            desiredCount: 0,
+          });
+        }
+        if (params.services.includes('arn:service/quuz')) {
+          services.push({
+            serviceArn: 'arn:service/quuz',
+            desiredCount: 10,
+          });
+        }
+
+        if (services.length === 0) {
+          throw new Error(`Wrong service arn`);
+        }
+
+        response.services = services;
+
+        callback(null, response);
+      },
+    );
+
+    AWSMock.mock(
+      'ApplicationAutoScaling',
+      'describeScalableTargets',
+      (
+        params: AWS.ApplicationAutoScaling.Types.DescribeScalableTargetsRequest,
+        callback: (
+          err: any,
+          res:
+            | AWS.ApplicationAutoScaling.Types.DescribeScalableTargetsResponse
+            | any,
+        ) => {},
+      ) => {
+        callback(null, {
+          ScalableTargets: [],
+        });
+      },
+    );
+
+    const instance = new StopFargateEcsServicesTrick();
+    const stateObject: StopFargateEcsServicesState = [];
+    const listr = await instance.getCurrentState(
+      task,
+      {
+        resourceTagMappings: [
+          { ResourceARN: 'arn:service/baz' },
+          { ResourceARN: 'arn:cluster/bar' },
+        ],
+      } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
+
+    await listr.run({});
+
+    expect(stateObject).toStrictEqual([
+      {
+        arn: 'arn:cluster/foo',
+        services: [
+          {
+            arn: 'arn:service/baz',
+            desired: 3,
+            scalableTargets: [
+              {
+                min: 2,
+                max: 8,
+                scalableDimension: 'ecs:service:DesiredCount',
+                resourceId: 'service/foo/baz',
+                namespace: 'ecs',
+              },
+            ],
           },
         ],
       },
@@ -387,6 +633,10 @@ describe('stop-fargate-ecs-services', () => {
           },
         ],
       },
+      {
+        arn: 'arn:cluster/bax',
+        services: [],
+      },
     ];
     const conserveListr = await instance.conserve(task, stateObject, {
       dryRun: false,
@@ -416,6 +666,29 @@ describe('stop-fargate-ecs-services', () => {
 
     AWSMock.restore('ECS');
     AWSMock.restore('ApplicationAutoScaling');
+  });
+
+  it('skips conserve if no clusters found', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    const instance = new StopFargateEcsServicesTrick();
+    const stateObject: StopFargateEcsServicesState = [];
+
+    const updateServiceSpy = jest
+      .fn()
+      .mockImplementationOnce((params, callback) => {
+        callback(null, {});
+      });
+    AWSMock.mock('ECS', 'updateService', updateServiceSpy);
+
+    await instance.conserve(task, stateObject, {
+      dryRun: false,
+    });
+
+    expect(updateServiceSpy).not.toBeCalled();
+    expect(task.skip).toBeCalledWith(expect.any(String));
+
+    AWSMock.restore('ECS');
   });
 
   it('skips conserve when desired count is already zero', async () => {

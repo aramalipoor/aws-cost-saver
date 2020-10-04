@@ -1,31 +1,63 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { KinesisStreamState } from '../states/kinesis-stream.state';
+import { TrickContext } from '../types/trick-context';
 
 export type DecreaseKinesisStreamsShardsState = KinesisStreamState[];
 
 export class DecreaseKinesisStreamsShardsTrick
   implements TrickInterface<DecreaseKinesisStreamsShardsState> {
+  static machineName = 'decrease-kinesis-streams-shards';
+
   private ksClient: AWS.Kinesis;
 
-  static machineName = 'decrease-kinesis-streams-shards';
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
 
   constructor() {
     this.ksClient = new AWS.Kinesis();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
     return DecreaseKinesisStreamsShardsTrick.machineName;
   }
 
+  async prepareTags(
+    task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
+    options: TrickOptionsInterface,
+  ): Promise<Listr | void> {
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['kinesis:stream'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
+  }
+
   async getCurrentState(
     task: ListrTaskWrapper<any, any>,
-    currentState: DecreaseKinesisStreamsShardsState,
+    context: TrickContext,
+    state: DecreaseKinesisStreamsShardsState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const streamNames = await this.listKinesisStreamsNames(task);
@@ -49,7 +81,16 @@ export class DecreaseKinesisStreamsShardsTrick
           const streamState = {
             name: streamName,
           } as KinesisStreamState;
-          currentState.push(streamState);
+
+          if (!this.isStreamIncluded(context, streamName)) {
+            return {
+              title: streamName,
+              task: async (ctx, task) =>
+                task.skip(`excluded due to tag filters`),
+            };
+          }
+
+          state.push(streamState);
           return {
             title: streamName,
             task: async (ctx, task) => this.getStreamState(task, streamState),
@@ -276,5 +317,13 @@ export class DecreaseKinesisStreamsShardsTrick
         })
         .promise()
     ).StreamDescriptionSummary;
+  }
+
+  private isStreamIncluded(context: TrickContext, streamName: string) {
+    return Boolean(
+      context.resourceTagMappings?.find(
+        rm => (rm.ResourceARN as string).split('/').pop() === streamName,
+      ),
+    );
   }
 }

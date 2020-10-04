@@ -5,9 +5,9 @@ import figures from 'figures';
 
 import BaseCommand from '../base-command';
 import { TrickRegistry } from '../tricks/trick.registry';
-import { configureAWS } from '../configure-aws';
-import { RootState } from '../interfaces/root-state';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { configureAWS } from '../util';
+import { RootState } from '../types/root-state';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 export default class Restore extends BaseCommand {
   static description =

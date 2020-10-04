@@ -1,7 +1,29 @@
-import { configureAWS } from '../src/configure-aws';
+import { configureAWS } from '../src/util';
 
 jest.mock('fs');
 import fs from 'fs';
+import nock from 'nock';
+
+beforeAll(async done => {
+  nock.disableNetConnect();
+  done();
+});
+
+beforeEach(async () => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  jest.clearAllMocks();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
+});
 
 beforeAll(() => {
   jest.spyOn(fs, 'readFileSync').mockImplementation((path: any) => {
@@ -31,7 +53,7 @@ region = eu-east-1
   });
 });
 
-describe.only('configure-aws', () => {
+describe('util', () => {
   it('uses user-provided region', async () => {
     const config = await configureAWS('aramium', 'ap-northeast-1');
 

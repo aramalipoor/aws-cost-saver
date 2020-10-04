@@ -2,17 +2,33 @@ import AWS from 'aws-sdk';
 import AWSMock from 'aws-sdk-mock';
 import { mockProcessStdout } from 'jest-mock-process';
 import { ListrTaskWrapper } from 'listr2';
+import nock from 'nock';
 
 import {
   ScaledownAutoScalingGroupsTrick,
   ScaledownAutoScalingGroupsState,
 } from '../../src/tricks/scaledown-auto-scaling-groups.trick';
+import { TrickContext } from '../../src/types/trick-context';
 import { AutoScalingGroupState } from '../../src/states/auto-scaling-group.state';
 import { createMockTask } from '../util';
 
 beforeAll(async done => {
+  nock.abortPendingRequests();
+  nock.cleanAll();
+  nock.disableNetConnect();
+
   mockProcessStdout();
   done();
+});
+
+afterEach(async () => {
+  const pending = nock.pendingMocks();
+
+  if (pending.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(pending);
+    throw new Error(`${pending.length} mocks are pending!`);
+  }
 });
 
 describe('scaledown-auto-scaling-groups', () => {
@@ -27,6 +43,14 @@ describe('scaledown-auto-scaling-groups', () => {
     expect(instance.getMachineName()).toBe(
       ScaledownAutoScalingGroupsTrick.machineName,
     );
+  });
+
+  it('skips preparing tags', async () => {
+    const instance = new ScaledownAutoScalingGroupsTrick();
+    await instance.prepareTags(task, {} as TrickContext, {
+      dryRun: false,
+    });
+    expect(task.skip).toBeCalled();
   });
 
   it('returns an empty state object if no ASG found', async () => {
@@ -47,9 +71,14 @@ describe('scaledown-auto-scaling-groups', () => {
 
     const instance = new ScaledownAutoScalingGroupsTrick();
     const stateObject: ScaledownAutoScalingGroupsState = [];
-    await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(stateObject.length).toBe(0);
 
@@ -81,9 +110,14 @@ describe('scaledown-auto-scaling-groups', () => {
 
     const instance = new ScaledownAutoScalingGroupsTrick();
     const stateObject: ScaledownAutoScalingGroupsState = [];
-    await instance.getCurrentState(task, stateObject, {
-      dryRun: false,
-    });
+    await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        dryRun: false,
+      },
+    );
 
     expect(stateObject).toStrictEqual(
       expect.objectContaining([
@@ -92,6 +126,70 @@ describe('scaledown-auto-scaling-groups', () => {
           desired: 3,
           min: 1,
           max: 10,
+        } as AutoScalingGroupState,
+      ]),
+    );
+
+    AWSMock.restore('AutoScaling');
+  });
+
+  it('generates state object for tagged resources', async () => {
+    AWSMock.setSDKInstance(AWS);
+
+    AWSMock.mock(
+      'AutoScaling',
+      'describeAutoScalingGroups',
+      (
+        params: AWS.AutoScaling.Types.AutoScalingGroupNamesType,
+        callback: Function,
+      ) => {
+        callback(null, {
+          AutoScalingGroups: [
+            {
+              AutoScalingGroupName: 'foo',
+              MinSize: 1,
+              MaxSize: 10,
+              DesiredCapacity: 3,
+            },
+            {
+              AutoScalingGroupName: 'bar',
+              MinSize: 3,
+              MaxSize: 6,
+              DesiredCapacity: 3,
+              Tags: [{ Key: 'Team', Value: 'Tacos' }],
+            },
+            {
+              AutoScalingGroupName: 'baz',
+              MinSize: 1,
+              MaxSize: 10,
+              DesiredCapacity: 3,
+              Tags: [{ Key: 'Team', Value: 'Chimichanga' }],
+            },
+          ],
+        } as AWS.AutoScaling.Types.AutoScalingGroupsType);
+      },
+    );
+
+    const instance = new ScaledownAutoScalingGroupsTrick();
+    const stateObject: ScaledownAutoScalingGroupsState = [];
+    await instance.getCurrentState(
+      task,
+      { resourceTagMappings: [] } as TrickContext,
+      stateObject,
+      {
+        tags: [{ Key: 'Team', Values: ['Tacos'] }],
+        dryRun: false,
+      },
+    );
+
+    expect(stateObject.length).toBe(1);
+    expect(stateObject).toStrictEqual(
+      expect.objectContaining([
+        {
+          name: 'bar',
+          desired: 3,
+          min: 3,
+          max: 6,
         } as AutoScalingGroupState,
       ]),
     );

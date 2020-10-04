@@ -1,34 +1,66 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { RdsClusterState } from '../states/rds-cluster.state';
+import { TrickContext } from '../types/trick-context';
 
 export type StopRdsDatabaseClustersState = RdsClusterState[];
 
 export class StopRdsDatabaseClustersTrick
   implements TrickInterface<StopRdsDatabaseClustersState> {
+  static machineName = 'stop-rds-database-clusters';
+
   private rdsClient: AWS.RDS;
 
-  static machineName = 'stop-rds-database-clusters';
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
 
   constructor() {
     this.rdsClient = new AWS.RDS();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
     return StopRdsDatabaseClustersTrick.machineName;
   }
 
+  async prepareTags(
+    task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
+    options: TrickOptionsInterface,
+  ): Promise<Listr | void> {
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['rds:cluster'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
+  }
+
   async getCurrentState(
     task: ListrTaskWrapper<any, any>,
-    currentState: StopRdsDatabaseClustersState,
+    context: TrickContext,
+    state: StopRdsDatabaseClustersState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
-    const clusters = await this.listClusters(task);
+    const clusters = await this.listClusters(task, options);
 
     const subListr = task.newListr([], {
       concurrent: 10,
@@ -49,7 +81,7 @@ export class StopRdsDatabaseClustersTrick
           return {
             title:
               cluster.DBClusterIdentifier || chalk.italic('<no-identifier>'),
-            task: async () => {
+            task: async (ctx, task) => {
               if (cluster.DBClusterIdentifier === undefined) {
                 throw new Error(
                   `Unexpected error: DBClusterIdentifier is missing for RDS cluster`,
@@ -62,7 +94,14 @@ export class StopRdsDatabaseClustersTrick
                 );
               }
 
-              currentState.push({
+              if (
+                !this.isArnIncluded(context, cluster.DBClusterArn as string)
+              ) {
+                task.skip(`ignored, due to tag filters`);
+                return;
+              }
+
+              state.push({
                 identifier: cluster.DBClusterIdentifier,
                 status: cluster.Status,
               });
@@ -213,6 +252,7 @@ export class StopRdsDatabaseClustersTrick
 
   private async listClusters(
     task: ListrTaskWrapper<any, any>,
+    options: TrickOptionsInterface,
   ): Promise<AWS.RDS.DBClusterList> {
     const clusters: AWS.RDS.DBClusterList = [];
 
@@ -230,5 +270,13 @@ export class StopRdsDatabaseClustersTrick
 
     task.output = 'done';
     return clusters;
+  }
+
+  private isArnIncluded(context: TrickContext, arn: string): boolean {
+    return Boolean(
+      context.resourceTagMappings?.find(
+        rm => (rm.ResourceARN as string) === arn,
+      ),
+    );
   }
 }

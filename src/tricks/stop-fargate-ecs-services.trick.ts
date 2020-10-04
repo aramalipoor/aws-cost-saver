@@ -2,35 +2,67 @@ import _ from 'lodash';
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { EcsClusterState } from '../states/ecs-cluster.state';
 import { EcsServiceState } from '../states/ecs-service.state';
+import { TrickContext } from '../types/trick-context';
 
 export type StopFargateEcsServicesState = EcsClusterState[];
 
 export class StopFargateEcsServicesTrick
   implements TrickInterface<StopFargateEcsServicesState> {
-  private ecsClient: AWS.ECS;
-
   static machineName = 'stop-fargate-ecs-services';
+
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
+
+  private ecsClient: AWS.ECS;
 
   private aasClient: AWS.ApplicationAutoScaling;
 
   constructor() {
     this.ecsClient = new AWS.ECS();
     this.aasClient = new AWS.ApplicationAutoScaling();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
     return StopFargateEcsServicesTrick.machineName;
   }
 
+  async prepareTags(
+    task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
+    options: TrickOptionsInterface,
+  ): Promise<Listr | void> {
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['ecs:cluster', 'ecs:service'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
+  }
+
   async getCurrentState(
     task: ListrTaskWrapper<any, any>,
-    currentState: StopFargateEcsServicesState,
+    context: TrickContext,
+    state: StopFargateEcsServicesState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const clustersArn = await this.listClusters(task);
@@ -55,10 +87,11 @@ export class StopFargateEcsServicesTrick
             arn: clusterArn,
             services: [],
           };
-          currentState.push(clusterState);
+          state.push(clusterState);
           return {
             title: clusterArn,
-            task: async (ctx, task) => this.getClusterState(task, clusterState),
+            task: async (ctx, task) =>
+              this.getClusterState(context, task, clusterState),
           };
         },
       ),
@@ -80,50 +113,69 @@ export class StopFargateEcsServicesTrick
       },
     });
 
-    for (const cluster of currentState) {
-      for (const service of cluster.services) {
+    if (currentState && currentState.length > 0) {
+      for (const cluster of currentState) {
         subListr.add({
-          title: `${chalk.blue(
-            StopFargateEcsServicesTrick.getEcsServiceResourceId(
-              cluster.arn,
-              service.arn,
-            ),
-          )}`,
-          task: (ctx, task) =>
-            task.newListr(
-              [
-                {
-                  title: chalk.bold(chalk.dim('desired count')),
-                  task: (ctx, task) =>
-                    this.conserveDesiredCount(task, cluster, service, options),
-                  options: {
-                    persistentOutput: true,
-                  },
-                },
-                {
-                  title: chalk.bold(chalk.dim('auto scaling')),
-                  task: (ctx, task) =>
-                    this.conserveScalableTargets(
-                      task,
-                      cluster,
-                      service,
-                      options,
-                    ),
-                  options: {
-                    persistentOutput: true,
-                  },
-                },
-              ],
-              {
-                exitOnError: false,
-                concurrent: true,
-                rendererOptions: {
-                  collapse: true,
-                },
-              },
-            ),
+          title: `${cluster.arn.split(':').pop()}`,
+          task: (ctx, task) => {
+            if (cluster.services.length === 0) {
+              task.skip(`no services found`);
+              return;
+            }
+
+            return task.newListr(
+              cluster.services.map(service => ({
+                title: `${chalk.blue(
+                  StopFargateEcsServicesTrick.getEcsServiceResourceId(
+                    cluster.arn,
+                    service.arn,
+                  ),
+                )}`,
+                task: (ctx, task) =>
+                  task.newListr(
+                    [
+                      {
+                        title: chalk.bold(chalk.dim('desired count')),
+                        task: (ctx, task) =>
+                          this.conserveDesiredCount(
+                            task,
+                            cluster,
+                            service,
+                            options,
+                          ),
+                        options: {
+                          persistentOutput: true,
+                        },
+                      },
+                      {
+                        title: chalk.bold(chalk.dim('auto scaling')),
+                        task: (ctx, task) =>
+                          this.conserveScalableTargets(
+                            task,
+                            cluster,
+                            service,
+                            options,
+                          ),
+                        options: {
+                          persistentOutput: true,
+                        },
+                      },
+                    ],
+                    {
+                      exitOnError: false,
+                      concurrent: true,
+                      rendererOptions: {
+                        collapse: true,
+                      },
+                    },
+                  ),
+              })),
+            );
+          },
         });
       }
+    } else {
+      task.skip(chalk.dim(`no Fargate clusters found`));
     }
 
     return subListr;
@@ -192,6 +244,7 @@ export class StopFargateEcsServicesTrick
   }
 
   private async getClusterState(
+    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
     clusterState: EcsClusterState,
   ) {
@@ -224,6 +277,20 @@ export class StopFargateEcsServicesTrick
             desired: service.desiredCount as number,
             scalableTargets: [],
           };
+
+          if (
+            !this.isServiceIncluded(
+              context,
+              clusterState.arn,
+              service.serviceArn,
+            )
+          ) {
+            return {
+              title: service.serviceArn,
+              task: async (ctx, task) =>
+                task.skip(`excluded due to tag filters`),
+            };
+          }
 
           clusterState.services.push(serviceState);
 
@@ -517,5 +584,17 @@ export class StopFargateEcsServicesTrick
       .pop();
 
     return `service/${clusterName}/${serviceName}`;
+  }
+
+  private isServiceIncluded(
+    context: TrickContext,
+    clusterArn: string,
+    serviceArn: string,
+  ): boolean {
+    return Boolean(
+      context.resourceTagMappings?.find(
+        rm => rm.ResourceARN === serviceArn || rm.ResourceARN === clusterArn,
+      ),
+    );
   }
 }

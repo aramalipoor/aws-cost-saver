@@ -1,31 +1,63 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { DynamoDBTableState } from '../states/dynamodb-table.state';
+import { TrickContext } from '../types/trick-context';
 
 export type DecreaseDynamoDBProvisionedRcuWcuState = DynamoDBTableState[];
 
 export class DecreaseDynamoDBProvisionedRcuWcuTrick
   implements TrickInterface<DecreaseDynamoDBProvisionedRcuWcuState> {
+  static machineName = 'decrease-dynamodb-provisioned-rcu-wcu';
+
   private ddbClient: AWS.DynamoDB;
 
-  static machineName = 'decrease-dynamodb-provisioned-rcu-wcu';
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
 
   constructor() {
     this.ddbClient = new AWS.DynamoDB();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
     return DecreaseDynamoDBProvisionedRcuWcuTrick.machineName;
   }
 
+  async prepareTags(
+    task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
+    options: TrickOptionsInterface,
+  ): Promise<Listr | void> {
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['dynamodb:table'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
+  }
+
   async getCurrentState(
     task: ListrTaskWrapper<any, any>,
-    currentState: DecreaseDynamoDBProvisionedRcuWcuState,
+    context: TrickContext,
+    state: DecreaseDynamoDBProvisionedRcuWcuState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const tableNames = await this.listTableNames(task);
@@ -49,7 +81,16 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
           const tableState = {
             name: tableName,
           } as DynamoDBTableState;
-          currentState.push(tableState);
+
+          if (!this.isTableIncluded(context, tableName)) {
+            return {
+              title: tableName,
+              task: async (ctx, task) =>
+                task.skip(`excluded due to tag filters`),
+            };
+          }
+
+          state.push(tableState);
           return {
             title: tableName,
             task: async (ctx, task) => this.getTableState(task, tableState),
@@ -142,20 +183,24 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
     tableState: DynamoDBTableState,
   ): Promise<void> {
     task.output = 'fetching table information...';
-    const provisionedThroughput = ((
+    const table = (
       await this.ddbClient
         .describeTable({ TableName: tableState.name })
         .promise()
-    ).Table as AWS.DynamoDB.TableDescription).ProvisionedThroughput;
+    ).Table as AWS.DynamoDB.TableDescription;
 
-    if (!provisionedThroughput) {
+    if (
+      !table.ProvisionedThroughput ||
+      !table.ProvisionedThroughput.ReadCapacityUnits ||
+      !table.ProvisionedThroughput.WriteCapacityUnits
+    ) {
       tableState.provisionedThroughput = false;
       return;
     }
 
     tableState.provisionedThroughput = true;
-    tableState.rcu = provisionedThroughput.ReadCapacityUnits as number;
-    tableState.wcu = provisionedThroughput.WriteCapacityUnits as number;
+    tableState.rcu = table.ProvisionedThroughput.ReadCapacityUnits as number;
+    tableState.wcu = table.ProvisionedThroughput.WriteCapacityUnits as number;
 
     task.output = 'done';
   }
@@ -251,5 +296,16 @@ export class DecreaseDynamoDBProvisionedRcuWcuTrick
       .promise();
 
     task.output = `configured RCU = ${tableState.rcu} WCU = ${tableState.wcu}`;
+  }
+
+  private isTableIncluded(
+    context: TrickContext,
+    tableName: AWS.DynamoDB.TableName,
+  ): boolean {
+    return Boolean(
+      context.resourceTagMappings?.find(
+        rm => (rm.ResourceARN as string).split('/').pop() === tableName,
+      ),
+    );
   }
 }

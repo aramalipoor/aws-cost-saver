@@ -1,31 +1,63 @@
 import AWS from 'aws-sdk';
 import chalk from 'chalk';
 import { Listr, ListrTask, ListrTaskWrapper } from 'listr2';
+import { ResourceTagMappingList } from 'aws-sdk/clients/resourcegroupstaggingapi';
 
-import { TrickInterface } from '../interfaces/trick.interface';
-import { TrickOptionsInterface } from '../interfaces/trick-options.interface';
+import { TrickInterface } from '../types/trick.interface';
+import { TrickOptionsInterface } from '../types/trick-options.interface';
 
 import { ElasticacheReplicationGroupState } from '../states/elasticache-replication-group.state';
+import { TrickContext } from '../types/trick-context';
 
 export type SnapshotRemoveElasticacheRedisState = ElasticacheReplicationGroupState[];
 
 export class SnapshotRemoveElasticacheRedisTrick
   implements TrickInterface<SnapshotRemoveElasticacheRedisState> {
+  static machineName = 'snapshot-remove-elasticache-redis';
+
   private elcClient: AWS.ElastiCache;
 
-  static machineName = 'snapshot-remove-elasticache-redis';
+  private rgtClient: AWS.ResourceGroupsTaggingAPI;
 
   constructor() {
     this.elcClient = new AWS.ElastiCache();
+    this.rgtClient = new AWS.ResourceGroupsTaggingAPI();
   }
 
   getMachineName(): string {
     return SnapshotRemoveElasticacheRedisTrick.machineName;
   }
 
+  async prepareTags(
+    task: ListrTaskWrapper<any, any>,
+    context: TrickContext,
+    options: TrickOptionsInterface,
+  ): Promise<Listr | void> {
+    const resourceTagMappings: ResourceTagMappingList = [];
+
+    // TODO Add logic to go through all pages
+    task.output = 'fetching page 1...';
+    resourceTagMappings.push(
+      ...((
+        await this.rgtClient
+          .getResources({
+            ResourcesPerPage: 100,
+            ResourceTypeFilters: ['elasticache:cluster'],
+            TagFilters: options.tags,
+          })
+          .promise()
+      ).ResourceTagMappingList as ResourceTagMappingList),
+    );
+
+    context.resourceTagMappings = resourceTagMappings;
+
+    task.output = 'done';
+  }
+
   async getCurrentState(
     task: ListrTaskWrapper<any, any>,
-    currentState: SnapshotRemoveElasticacheRedisState,
+    context: TrickContext,
+    state: SnapshotRemoveElasticacheRedisState,
     options: TrickOptionsInterface,
   ): Promise<Listr> {
     const replicationGroups = await this.listReplicationGroups(task);
@@ -60,13 +92,16 @@ export class SnapshotRemoveElasticacheRedisTrick
                 id: replicationGroup.ReplicationGroupId,
               } as ElasticacheReplicationGroupState;
 
-              currentState.push(replicationGroupState);
-
-              return this.getReplicationGroupState(
+              const changes = await this.getReplicationGroupState(
+                context,
                 task,
                 replicationGroupState,
                 replicationGroup,
               );
+
+              if (changes) {
+                state.push({ ...replicationGroupState, ...changes });
+              }
             },
             options: {
               persistentOutput: true,
@@ -246,10 +281,11 @@ export class SnapshotRemoveElasticacheRedisTrick
   }
 
   private async getReplicationGroupState(
+    context: TrickContext,
     task: ListrTaskWrapper<any, any>,
     replicationGroupState: ElasticacheReplicationGroupState,
     replicationGroup: AWS.ElastiCache.ReplicationGroup,
-  ): Promise<void> {
+  ): Promise<ElasticacheReplicationGroupState | undefined> {
     replicationGroupState.status = 'unknown';
 
     if (replicationGroup.ARN === undefined) {
@@ -288,6 +324,11 @@ export class SnapshotRemoveElasticacheRedisTrick
       throw new Error(`Could not find sample cache cluster`);
     }
 
+    if (!this.isClusterIncluded(context, sampleCacheCluster.ARN as string)) {
+      task.skip(`excluded due to tag filters`);
+      return;
+    }
+
     task.output = 'preparing re-create params...';
     const snapshotName = SnapshotRemoveElasticacheRedisTrick.generateSnapshotName(
       replicationGroup,
@@ -305,6 +346,8 @@ export class SnapshotRemoveElasticacheRedisTrick
     replicationGroupState.createParams = createParams;
 
     task.output = 'done';
+
+    return replicationGroupState;
   }
 
   private generateNodeGroupConfigs(
@@ -443,6 +486,15 @@ export class SnapshotRemoveElasticacheRedisTrick
         })
         .promise()
     ).TagList as AWS.ElastiCache.TagList;
+  }
+
+  private isClusterIncluded(
+    context: TrickContext,
+    clusterArn: string,
+  ): boolean {
+    return Boolean(
+      context.resourceTagMappings?.find(rm => rm.ResourceARN === clusterArn),
+    );
   }
 
   private static generateSnapshotName(

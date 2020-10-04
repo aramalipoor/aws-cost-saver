@@ -13,11 +13,6 @@ const config = {
     '<rootDir>/node_modules/',
     '<rootDir>/test/',
   ],
-  globals: {
-    'ts-jest': {
-      tsConfig: 'test/tsconfig.json',
-    },
-  },
 };
 
 module.exports = config;
