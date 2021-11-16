@@ -1196,25 +1196,10 @@ aws-sdk-mock@^5.1.0:
     sinon "^9.0.1"
     traverse "^0.6.6"
 
-aws-sdk@*, aws-sdk@^2.730.0:
-  version "2.738.0"
-  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.738.0.tgz#37e4b75ab1acf9bc01bea5d4f83ebb937842de6a"
-  integrity sha512-oO1odRT4DGssivoP6lHO3yB6I+5sU0uqpj6UJ0kS5wrHQ9J9EGrictLVKA9y6XhN0sNW+XPNLD9jMMY/A+gXWA==
-  dependencies:
-    buffer "4.9.2"
-    events "1.1.1"
-    ieee754 "1.1.13"
-    jmespath "0.15.0"
-    querystring "0.2.0"
-    sax "1.2.1"
-    url "0.10.3"
-    uuid "3.3.2"
-    xml2js "0.4.19"
-
-aws-sdk@^2.637.0:
-  version "2.741.0"
-  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.741.0.tgz#b832d838e5f1ef9cdb2b4901ade4555b1ca4c085"
-  integrity sha512-bpk5VvlBSvKu3Lg30AxX+PHk+0TD69K3tYe6D6VeEFl/3XzuZ5RKTGCIl96isSMyYc5bBMhLS9pC9glrxT7OTw==
+aws-sdk@*, aws-sdk@^2.637.0, aws-sdk@^2.730.0:
+  version "2.814.0"
+  resolved "https://registry.yarnpkg.com/aws-sdk/-/aws-sdk-2.814.0.tgz#7a1c36006e0b5826f14bd2511b1d229ef6814bb0"
+  integrity sha512-empd1m/J/MAkL6d9OeRpmg9thobULu0wk4v8W3JToaxGi2TD7PIdvE6yliZKyOVAdJINhBWEBhxR4OUIHhcGbQ==
   dependencies:
     buffer "4.9.2"
     events "1.1.1"
